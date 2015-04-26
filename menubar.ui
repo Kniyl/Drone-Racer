@@ -1,0 +1,63 @@
+<?xml version="1.0"?>
+<interface>
+    <menu id="appmenu">
+        <section>
+            <item>
+                <attribute name="label">_Nouveau...</attribute>
+                <attribute name="action">app.win_new_dialog</attribute>
+                <attribute name="accel">&lt;Primary&gt;n</attribute>
+            </item>
+            <item>
+                <attribute name="label">_Ouvrir...</attribute>
+                <attribute name="action">app.win_open_dialog</attribute>
+                <attribute name="accel">&lt;Primary&gt;o</attribute>
+            </item>
+            <item>
+                <attribute name="label">_Fermer</attribute>
+                <attribute name="action">app.win_close</attribute>
+                <attribute name="accel">&lt;Primary&gt;f</attribute>
+            </item>
+        </section>
+        <section>
+            <item>
+                <attribute name="label">_Quitter</attribute>
+                <attribute name="action">app.quit</attribute>
+                <attribute name="accel">&lt;Primary&gt;q</attribute>
+            </item>
+        </section>
+    </menu>
+    <menu id="menubar">
+        <submenu>
+            <attribute name="label">_Gestion</attribute>
+            <section>
+                <item>
+                    <attribute name="label">_Pilotes &amp; Drones</attribute>
+                    <attribute name="action">app.win_register_dialog</attribute>
+                </item>
+                <item>
+                    <attribute name="label">_Catégories</attribute>
+                    <attribute name="action">app.dialog_categories</attribute>
+                </item>
+                <item>
+                    <attribute name="label">_Jeux</attribute>
+                    <attribute name="action">app.win_game_dialog</attribute>
+                </item>
+            </section>
+            <section>
+                <item>
+                    <attribute name="label">_REST server</attribute>
+                    <attribute name="action">app.rest</attribute>
+                </item>
+            </section>
+        </submenu>
+        <submenu>
+            <attribute name="label">_Statistiques</attribute>
+            <section>
+                <item>
+                    <attribute name="label">Pilote</attribute>
+                    <attribute name="action">app.dialog_driver</attribute>
+                </item>
+            </section>
+        </submenu>
+    </menu>
+</interface>
