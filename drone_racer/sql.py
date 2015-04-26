@@ -156,7 +156,7 @@ class Database:
                 'Impossible de voir les jeux associés.')
         try:
             query = 'INSERT INTO jeux(event_id, intitule, nb_drones, '\
-                    'temps_max, tours_min, free_fly, strict) '
+                    'temps_max, tours_min, free_fly, strict) '\
                     'VALUES (?,?,?,?,?,?,?)'
             self._execute(query, self.id, name, num, time, laps, free, strict)
             created = True

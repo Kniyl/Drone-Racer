@@ -1,6 +1,7 @@
 from threading import Timer
 from enum import Enum
-import rest
+
+from . import rest
 
 
 class ConsoleError(Exception):

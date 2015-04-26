@@ -1,10 +1,10 @@
 from gi.repository import Gtk, GLib, Gio, Gdk, Pango
 from threading import Timer
-from threads import StdInReader
 
-from console import Console, ConsoleError, Rules, FreeForAll, Beacons
-from sql import sql_create, sql_open, SQLError
-import rest
+from .threads import StdInReader
+from .console import Console, ConsoleError, Rules, FreeForAll, Beacons
+from .sql import sql_create, sql_open, SQLError
+from . import rest
 
 
 class UserDialog(Gtk.Dialog):
@@ -62,7 +62,7 @@ class DroneRacer(Gtk.Application):
     def on_startup(self, app):
         self.window = DroneRacerWindow(app, self.fancy)
         app.add_window(self.window)
-        builder = Gtk.Builder.new_from_file('menubar.ui')
+        builder = Gtk.Builder.new_from_file('resources/ui/menubar.ui')
         builder.connect_signals(app)
         app.set_app_menu(builder.get_object('appmenu'))
         app.set_menubar(builder.get_object('menubar'))
@@ -233,7 +233,8 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         self.main.set_homogeneous(True)
         self.add(self.main)
 
-        self.main.add_named(Gtk.Image.new_from_file('home.jpg'), 'default')
+        self.main.add_named(
+                Gtk.Image.new_from_file('resources/img/home.jpg'), 'default')
         self.main.add_named(self.create_event(), 'opened')
         self.main.add_named(self.create_loaded(), 'loaded')
         self.main.add_named(self.create_register(), 'register')
@@ -1177,13 +1178,3 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         self.reader_thread.should_continue = False
         print('Drone Racer successfully shut down')
 
-
-if __name__ == '__main__':
-    from argparse import ArgumentParser
-
-    parser = ArgumentParser(description='Interface graphique "Drone Racer"')
-    parser.add_argument('--fancy-title', dest='fancy', action='store_true',
-                        help='Utilise une barre de titre un peu plus Gtk3')
-    args = parser.parse_args()
-    app = DroneRacer(args.fancy)
-    app.run()
