@@ -8,10 +8,18 @@ except ImportError:
     import json
 
 
+# Default address for the server providing the REST API
 _REST_ADDR = 'http://localhost/'
 
 
 def _execute_request(verb, path, **kwargs):
+    """Send an HTTP request to the REST API.
+
+    Parameters:
+        verb: HTTP verb to use for the request (mainly 'GET' and 'POST').
+        path: URL of the target page.
+        kwargs: extra arguments for the request such as POST data or timeout.
+    """
     try:
         request(verb, _REST_ADDR + path, **kwargs)
     except RequestException as e:
@@ -20,6 +28,12 @@ def _execute_request(verb, path, **kwargs):
             print(pretty_print, file=stderr)
 
 def _do_request(path, args=None):
+    """Execute a request on a separate thread to avoid waiting on I/O.
+
+    Parameters:
+        path: URL of the target page.
+        args: POST data for the page that will be json encoded.
+    """
     if args:
         thread = Thread(target=_execute_request,
                 name='rest-post',
@@ -33,33 +47,40 @@ def _do_request(path, args=None):
     thread.start()
 
 def setup(game_name, rules, *people):
+    """Tell the REST API about a new race that is likely to be started soon.
+
+    Parameters:
+        game_name: name for the route and custom rules used for this race.
+        rules: route and custom rules data for this race.
+        people: informations on the drivers of this race.
     """
+    """JSON
     Setup object:
     -------------
      - pilotes: Array of driver objects
-            -> pilotes pour la course
+            -> drivers for this race
      - course: Race object
-            -> configuration de la course
+            -> rules for this race
 
     Race object:
     ------------
      - nom: string
-            -> type de jeu
+            -> name for the set of rules
      - temps: number or null
-            -> temps disponible pour finir la course, si pertinent
+            -> time available before the race ends, if relevant
      - tours: number or null
-            -> nombre de tours à réaliser pour finir la course, si pertinent
+            -> number or laps needed to clear the race, if relevant
      - portes: Array of strings
-            -> identifiants des portes actives pour la course
+            -> active gates identificators for this race
 
     Driver object:
     --------------
      - id: number
-            -> identifiant de la balise donnée au pilote pour la course
+            -> identification of the beacon given to the driver for the race
      - nom: string
-            -> nom du pilote
+            -> name of the driver
      - drone: string
-            -> type de son drone
+            -> kind of its drone
     """
     setup = rules.get_setup()
     setup.update({'nom': game_name})
@@ -67,71 +88,87 @@ def setup(game_name, rules, *people):
     _do_request('setup/', data)
 
 def warmup(text):
+    """Tell the REST API that a race is being started and provide a
+    text to display.
     """
-    Warmup object:
+    """JSON
+    Warm-up object:
     --------------
      - texte: string
-            -> texte à afficher
+            -> text to display
      - start: bool
-            -> savoir si on doit démarrer la course (chrono, classement, etc.)
+            -> whether the race should be started (timer, leader-board, etc.)
     """
     _do_request('warmup/', text)
 
 def update(drone):
-    """
+    """Tell the REST API that a drone had its status changed."""
+    """JSON
     Drone object:
     -------------
      - id: number
-            -> identifiant de la balise portée par le drone
+            -> identification number of the beacon attached on the drone
      - position: number
-            -> position du drone dans la course
+            -> ranking of the drone at this moment of the race
      - points: number
-            -> nombre de points engrangés par le drone jusqu’ici
+            -> number of points for the drone at this moment of the race
      - temps: number
-            -> temps depuis le début du tour
-     - retard: number
-            -> retard accumulé sur le drone de tête
+            -> elapsed time from the beginning of the current lap
+     - retard: number or null
+            -> delay accumulated over the first overall drone, if relevant
      - tour: number or null
-            -> temps du dernier tour, si pertinent
+            -> timing of the last lap for this drone, if relevant
      - finish: bool or null
-            -> état du drone à la fin de la course (finish/dead), si pertinent
+            -> whether the drone finished the race or was declared dead,
+                if it is not still flying
      - tours: number
-            -> nombre de tours réalisés par le drone
+            -> number of laps performed by the drone
      - porte: string or null
-            -> identifiant de la dernière porte traversée, si pertinent
+            -> identification of the last gate the drone passed by, if relevant
     """
     _do_request('update/', drone)
 
 def cancel():
-    """Pas de données"""
+    """Tell the REST API that a race has been canceled."""
+    """JSON
+    No data
+    """
     _do_request('cancel/')
 
 def finish():
-    """Pas de données"""
+    """Tell the REST API that a race just finished.
+    Leader-board may still change.
+    """
+    """JSON
+    No data
+    """
     _do_request('finish/')
 
 def leaderboard(*drones):
-    """Array of drone objects.
-    
+    """Send the final leader-board to the REST API."""
+    """JSON
+    Array of drone objects.
+
     Drone object:
     -------------
      - id: number
-            -> identifiant de la balise portée par le drone
+            -> identification number of the beacon attached on the drone
      - position: number
-            -> position du drone dans la course
+            -> ranking of the drone at this moment of the race
      - points: number
-            -> nombre de points engrangés par le drone jusqu’ici
+            -> number of points for the drone at this moment of the race
      - temps: number
-            -> temps depuis le début du tour
-     - retard: number
-            -> retard accumulé sur le drone de tête
+            -> elapsed time from the beginning of the current lap
+     - retard: number or null
+            -> delay accumulated over the first overall drone, if relevant
      - tour: number or null
-            -> temps du dernier tour, si pertinent
+            -> timing of the last lap for this drone, if relevant
      - finish: bool or null
-            -> état du drone à la fin de la course (finish/dead), si pertinent
+            -> whether the drone finished the race or was declared dead,
+                if it is not still flying
      - tours: number
-            -> nombre de tours réalisés par le drone
+            -> number of laps performed by the drone
      - porte: string or null
-            -> identifiant de la dernière porte traversée, si pertinent
+            -> identification of the last gate the drone passed by, if relevant
     """
     _do_request('leaderboard/', drones)

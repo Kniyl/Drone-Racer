@@ -2,34 +2,61 @@ from gi.repository import Gtk, GLib, Gio, Gdk, Pango
 from threading import Timer
 
 from .threads import StdInReader
-from .console import Console, ConsoleError, Rules, FreeForAll, Beacons
+from .console import Console, ConsoleError, Rules, FreeForAll, Gates
 from .sql import sql_create, sql_open, SQLError
 from . import rest
 
 
 class UserDialog(Gtk.Dialog):
+    """Custom dialog window that populates its content from a function call."""
+
     def __init__(self, parent, title, generate):
+        """Create and show the dialog window.
+        
+        Parameters:
+          - parent: the parent window of this dialog
+          - title: text displayed in the title bar of the dialog
+          - generate: a function that returns the widget to put in this dialog
+        """
+        # Force the dialog to be modal
         Gtk.Dialog.__init__(self, title, parent, Gtk.DialogFlags.MODAL)
+        self.set_default_size(50,50)
+
+        # Add a pretty button
         button = self.add_button('Fermer', 0)
         button.set_image(Gtk.Image(icon_name='window-close'))
         button.set_always_show_image(True)
 
+        # Populate the dialog
         self._generate = generate
         self.get_content_area().add(self._do_generate())
 
         self.show_all()
 
     def _do_generate(self):
+        """Return the content to display in the dialog."""
         return self._generate()
 
 
 class WaitDialog(UserDialog):
+    """Custom dialog window that simulates a Gtk.MessageDialog with better UI
+    and granularity.
+    """
+
     def __init__(self, parent, main_text, secondary_text):
+        """Create and show the dialog window.
+
+        Parameters:
+          - parent: the parent window of this dialog
+          - main_text: the important but short message displayed by the dialog
+          - secondary_text: a longer explanation for the main_text message
+        """
         self._main = main_text
         self._secondary = secondary_text
         super().__init__(parent, 'Oups', None)
         
     def _do_generate(self):
+        """Return the content to display in the dialog."""
         hbox = Gtk.HBox()
         vbox = Gtk.VBox(spacing=1)
         vbox.set_margin_top(10)
@@ -40,6 +67,7 @@ class WaitDialog(UserDialog):
         label.set_markup('<b><big>{}</big></b>'.format(self._main))
         vbox.pack_start(label, True, True, 0)
         label = Gtk.Label(label=self._secondary)
+        # Keep the dialog width as small as possible
         label.set_line_wrap(True)
         vbox.pack_start(label, False, False, 0)
         image = Gtk.Image(icon_name='dialog-error',
@@ -50,51 +78,87 @@ class WaitDialog(UserDialog):
 
 
 class DroneRacer(Gtk.Application):
-    def __init__(self, fancy=False):
+    """Custom application life-cycle that creates itself the window of
+    our choice with which it will associate. Manage the menu bar for
+    this window.
+    """
+
+    def __init__(self, reader, fancy=False):
+        """Initialize the application life-cycle and connect management
+        functions to its main events.
+
+        Parameters:
+          - reader: class used to instantiate the thread that will read
+            events from the gates
+          - fancy: whether the main window should use a fancy header bar or
+            the regular title bar
+        """
         Gtk.Application.__init__(self)
         self.set_application_id('org.race.drone')
         self.set_flags(0)
-        self.fancy = fancy
+        # Save window parameters for later use
+        self.window_setup = (reader, fancy)
+
         self.connect('startup', self.on_startup)
         self.connect('activate', self.on_activate)
         self.connect('shutdown', self.on_shutdown)
 
     def on_startup(self, app):
-        self.window = DroneRacerWindow(app, self.fancy)
+        """React to the 'startup' signal.
+
+        Build the main window, its menu bar and create actions to react to
+        clicks on the menu items.
+        """
+        self.window = DroneRacerWindow(app, *self.window_setup)
+        self.window_setup = None
         app.add_window(self.window)
         builder = Gtk.Builder.new_from_file('resources/ui/menubar.ui')
         builder.connect_signals(app)
         app.set_app_menu(builder.get_object('appmenu'))
         app.set_menubar(builder.get_object('menubar'))
 
+        # Connect database independent menu items
         self._connect_action('win_new_dialog', self.window.new_database)
         self._connect_action('win_open_dialog', self.window.open_database)
         self._connect_action('win_close', self.window.close_database)
         self._connect_action('quit', lambda a,u: self.quit())
+        self._connect_action('rest', self._manage_rest_server)
 
+        # Connect database dependent menu items
         self._connect_action('win_register_dialog',
-                self.show_dialog, 'registration_dialog')
+                self._show_dialog, 'registration_dialog')
         self._connect_action(
                 'dialog_categories',
-                self.create_dialog,
+                self._create_dialog,
                 'Gestion de la catégorie d’un drone',
                 self.window.create_manage_categories)
         self._connect_action('win_game_dialog',
-                self.show_dialog, 'game_dialog')
-        self._connect_action('rest', self.manage_rest_server)
+                self._show_dialog, 'game_dialog')
 
     def on_activate(self, app):
+        """React to the 'activate' signal. Show the main window to the user."""
         self.window.show_all()
 
     def on_shutdown(self, app):
+        """React to the 'shutdown' signal. Sweep remaining data from the
+        application before leaving.
+        """
         self.window.shutdown()
 
     def _connect_action(self, name, callback, *extra_args):
+        """Create an action that will be triggered by a click
+        on a menu item.
+        """
         action = Gio.SimpleAction.new(name, None)
         action.connect('activate', callback, *extra_args)
         self.add_action(action)
 
-    def show_dialog(self, action, u_data, attr_name):
+    def _show_dialog(self, action, u_data, attr_name):
+        """Show an already existing dialog window and wait for it to return.
+        If there is no database opened yet, show an error message instead.
+        """
+        # Equivalent to checking if self.window.db.id < 0 but
+        # without having to check if self.window.db is not None
         if self.window.beacon_names is None:
             dialog = WaitDialog(self.window,
                     'Aucune base de donnée connectée',
@@ -108,7 +172,12 @@ class DroneRacer(Gtk.Application):
             dialog.run()
             dialog.hide()
 
-    def create_dialog(self, action, u_data, title, generate_content):
+    def _create_dialog(self, action, u_data, title, generate_content):
+        """Create a dialog window and wait for it to return.
+        If there is no database opened yet, show an error message instead.
+        """
+        # Equivalent to checking if self.window.db.id < 0 but
+        # without having to check if self.window.db is not None
         if self.window.beacon_names is None:
             dialog = WaitDialog(self.window,
                     'Aucune base de donnée connectée',
@@ -119,7 +188,11 @@ class DroneRacer(Gtk.Application):
         dialog.run()
         dialog.destroy()
 
-    def manage_rest_server(self, action, user_data):
+    def _manage_rest_server(self, action, user_data):
+        """Create a dialog window to specifically manage the URL to the
+        web server hosting the REST API.
+        """
+        # Create the dialog, populate and show it
         dialog = Gtk.Dialog('REST server', self.window, Gtk.DialogFlags.MODAL)
         dialog.set_border_width(5)
         button = dialog.add_button('Annuler', Gtk.ResponseType.CANCEL)
@@ -136,41 +209,36 @@ class DroneRacer(Gtk.Application):
         entry.set_text(rest._REST_ADDR)
         box.pack_start(entry, False, False, 1)
         dialog.show_all()
+        # Wait for user interaction
         response = dialog.run()
+        # Update the REST server URL if need be
         if response == Gtk.ResponseType.OK:
             rest._REST_ADDR = entry.get_text()
         dialog.destroy()
 
-    def manage_categories(self, action, user_data):
-        if self.window.beacon_names is None:
-            dialog = WaitDialog(self.window,
-                    'Aucune base de donnée connectée',
-                    'Ouvrez ou créez une base de donnée '
-                    'avant d’utiliser cette action.')
-        else:
-            dialog = Gtk.Dialog(
-                    'Gestion des catégories de drones',
-                    self.window, Gtk.DialogFlags.MODAL)
-            #dialog.get_content_area().add(self.window.create_categories())
-            dialog.get_content_area().add(Gtk.Label('hello'))
-            button = self.add_button('Fermer', 0)
-            button.set_image(Gtk.Image(icon_name='window-close'))
-            button.set_always_show_image(True)
-            dialog.show_all()
-        dialog.run()
-        dialog.destroy()
-
         
 class DroneRacerWindow(Gtk.ApplicationWindow):
-    def __init__(self, application, fancy=False):
-        # Attributs hors Gtk
+    """Main window for the application. Manage everything, gather all the
+    informations, do all the things.
+    """
+
+    def __init__(self, application, reader, fancy):
+        """Instantiate and populate the window.
+
+        Parameters:
+          - application: the DroneRacer instance that this window is bound to
+          - reader: class used to instantiate the thread that will read
+            events from the gates
+          - fancy: whether this window should use a fancy header bar or
+            the regular title bar
+        """
+        # Non-Gtk attributes
         self.console = Console(self.get_time, self.update_race)
-        self.reader_thread = StdInReader(self.console)
-        self.reader_thread.start()
+        self.reader_thread = reader(self.console.compute_data)
         self.db = None
         self.beacon_names = None
 
-        # Paramètres de base
+        # Basic setup
         Gtk.ApplicationWindow.__init__(self,
                 title='Drone Racer', application=application)
         self.set_border_width(0)
@@ -190,7 +258,7 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
             self.set_custom_title =\
                     lambda text: self.set_title(text + ' | Drone Racer')
 
-        # Éléments partagés entre différentes fonctions
+        # Widgets shared between several functions
         self.event_dropdown = Gtk.ComboBoxText.new_with_entry()
         self.event_dropdown.connect('changed', self._on_event_selected)
         self.event_entry = Gtk.Entry()
@@ -212,9 +280,10 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         self.race_dropdown.connect('changed', self._on_race_change)
         self.race_box = Gtk.VBox(spacing=6)
         
-        # Éléments se modifiant durant une course (attention au multithreading)
+        # Widgets that are updated during a race (beware of multi-threading)
         self.label_warmup = Gtk.Label()
-        self.label_font = self.label_warmup.get_pango_context().get_font_description()
+        self.label_font = self.label_warmup.get_pango_context(
+                ).get_font_description()
         self.update_box = Gtk.ListStore(
                 int, str, str, int, int, int, str, str, str, str, str, str)
         self.button_box = Gtk.HBox()
@@ -222,7 +291,7 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         self.timer = 0
         self.race_id = None
 
-        # Contenu
+        # Populate content
         self.main = Gtk.Stack()
         self.main.set_margin_top(10)
         self.main.set_margin_bottom(10)
@@ -247,11 +316,11 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         self._create_popup_dialog('game',
                 'Aménagement de l’aire de jeu', self.create_game_manager)
 
-    ###                                                           ###
-    #                                                               #
-    # Création et activation des différentes parties de l’interface #
-    #                                                               #
-    ###                                                           ###
+    ###                                 ###
+    #                                     #
+    # Building and activating UI elements #
+    #                                     #
+    ###                                 ###
     def _create_popup_dialog(self, attr, title, generate_content):
         dialog = Gtk.Dialog(title, self, Gtk.DialogFlags.MODAL)
         dialog.get_content_area().add(generate_content(dialog.response))
@@ -528,7 +597,7 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
             is_strict = strict.get_active()
             try:
                 rules_type = FreeForAll if free_fly else Rules
-                rules_type(race_time, race_laps, beacons)
+                rules_type(race_time, is_strict, race_laps, beacons)
             except ConsoleError as e:
                 dialog = WaitDialog(self,
                         'Erreur à la création d’un type de jeu',
@@ -617,7 +686,7 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
                     _, race_time, race_laps, free_fly, strict, beacons =\
                             self.db.get_game_settings(game_name)
                     rules_type = FreeForAll if free_fly else Rules
-                    rules = rules_type(race_time, race_laps, beacons)
+                    rules = rules_type(race_time, strict, race_laps, beacons)
                 except ConsoleError as e:
                     dialog = WaitDialog(self,
                             'Erreur à la création d’une course',
@@ -757,11 +826,11 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
             self.button_box.get_children()[2].hide()
             self.button_box.get_children()[3].hide()
 
-    ###                                                    ###
-    #                                                        #
-    # Création différentes boites de dialogue pour les menus #
-    #                                                        #
-    ###                                                    ###
+    ###                                                   ###
+    #                                                       #
+    # Building dialog windows that react to menu activation #
+    #                                                       #
+    ###                                                   ###
     def create_manage_categories(self):
         panel = Gtk.VBox(spacing=6)
         row = Gtk.HBox()
@@ -792,11 +861,11 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         dropdown.connect('changed', load)
         return panel
 
-    ###                          ###
-    #                              #
-    # Gestion de la base de donnée #
-    #                              #
-    ###                          ###
+    ###                 ###
+    #                     #
+    # Database management #
+    #                     #
+    ###                 ###
     def new_database(self, *extra_args):
         self._load_database(
             'Créer une nouvelle base de donnée',
@@ -850,11 +919,11 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         self.activate_default()
         self._clear_dropdown_values()
 
-    ###                                            ###
-    #                                                #
-    # Machine à état, chargement et purge de données #
-    #                                                #
-    ###                                            ###
+    ###                                       ###
+    #                                           #
+    # State machine: loading and unloading data #
+    #                                           #
+    ###                                       ###
     def _load_dropdown_values(self):
         self.driver_dropdown.set_active(-1)
         self.driver_dropdown_dialog.set_active(-1)
@@ -885,11 +954,11 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         self.race_dropdown.set_active(-1)
         self.race_dropdown.remove_all()
 
-    ###                            ###
-    #                                #
-    # Gestion des différents signaux #
-    #                                #
-    ###                            ###
+    ###              ###
+    #                  #
+    # Signals handlers #
+    #                  #
+    ###              ###
     def _on_event_selected(self, widget):
         if widget.get_active() > -1:
             nb_beacons = self.db.get_event_settings(widget.get_active_text())
@@ -1024,11 +1093,11 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
             row.pack_start(dropdown, False, False, 4)
             row.pack_start(Gtk.Label('Type'), False, False, 4)
             dropdown = Gtk.ComboBoxText()
-            for beacon in Beacons:
+            for beacon in Gates:
                 dropdown.append_text(beacon.description)
             label = Gtk.Label('**aucun type défini**')
             dropdown.connect('changed', lambda d: label.set_text(
-                'Multiplicateur' if Beacons(d.get_active()).is_time
+                'Multiplicateur' if Gates(d.get_active()).is_time
                 else 'Nombre de points'))
             dropdown.set_active(4)
             row.pack_start(dropdown, False, False, 4)
@@ -1092,7 +1161,7 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
     def _on_judge_edition(self, widget, path, text):
         if not text:
             return
-        drone = self.update_box[path][0] - 1
+        drone = self.update_box[path][0]
         try:
             points = int(text)
         except ValueError:
@@ -1100,11 +1169,11 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         else:
             self.console.edit_score(drone, points)
 
-    ###                            ###
-    #                                #
-    # Gestion d’une course en direct #
-    #                                #
-    ###                            ###
+    ###                        ###
+    #                            #
+    # Managing races: going live #
+    #                            #
+    ###                        ###
     def show_countdown(self):
         self.countdown -= 1
         c = self.countdown
@@ -1168,13 +1237,12 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
 
     ###                              ###
     #                                  #
-    # Coup de balai après la fermeture #
+    # Sweep and close when we are done #
     #                                  #
     ###                              ###
     def shutdown(self, *args):
         if self.db:
             self.db.close()
         rest.cancel()
-        self.reader_thread.should_continue = False
+        self.reader_thread.stop()
         print('Drone Racer successfully shut down')
-
