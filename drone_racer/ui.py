@@ -127,13 +127,14 @@ class DroneRacer(Gtk.Application):
         # Connect database dependent menu items
         self._connect_action('win_register_dialog',
                 self._show_dialog, 'registration_dialog')
-        self._connect_action(
-                'dialog_categories',
+        self._connect_action('dialog_categories',
                 self._create_dialog,
                 'Gestion de la catégorie d’un drone',
                 self.window.create_manage_categories)
         self._connect_action('win_game_dialog',
                 self._show_dialog, 'game_dialog')
+        self._connect_action('stats_driver', self._create_dialog,
+                'Statistiques de pilotes', self.window.create_stats_drivers)
 
     def on_activate(self, app):
         """React to the 'activate' signal. Show the main window to the user."""
@@ -859,6 +860,32 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
                 entry.get_child().set_text(self.db.get_category_for_drone(
                     widget.get_active_text()))
         dropdown.connect('changed', load)
+        return panel
+
+    def create_stats_drivers(self):
+        panel = Gtk.VBox(spacing=6)
+        row = Gtk.HBox()
+        row.pack_start(Gtk.Label('Pilote'), False, False, 4)
+        dropdown = Gtk.ComboBoxText()
+        for driver in self.db.get_drivers():
+            dropdown.append_text(driver)
+        row.pack_start(dropdown, True, True, 4)
+        panel.pack_start(row, True, False, 4)
+        row = Gtk.HBox()
+        panel.pack_start(row, True, False, 4)
+        scroll = Gtk.ScrolledWindow(vexpand=True, hexpand=True)
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll.set_min_content_height(200)
+        scroll.add(Gtk.Label('--- En attente de la sélection d’un pilote ---'))
+        panel.pack_start(scroll, True, False, 4)
+        def update(widget):
+            scroll.get_child().destroy()
+            scroll.add(Gtk.Label(widget.get_active_text()))
+            scroll.show_all()
+            row.foreach(lambda w: w.destroy())
+            row.add(Gtk.Label('bite'))
+            row.show_all()
+        dropdown.connect('changed', update)
         return panel
 
     ###                 ###

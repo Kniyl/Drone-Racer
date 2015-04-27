@@ -55,7 +55,7 @@
             <section>
                 <item>
                     <attribute name="label">Pilote</attribute>
-                    <attribute name="action">app.dialog_driver</attribute>
+                    <attribute name="action">app.stats_driver</attribute>
                 </item>
             </section>
         </submenu>
