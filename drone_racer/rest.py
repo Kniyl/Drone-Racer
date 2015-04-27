@@ -113,7 +113,7 @@ def update(drone):
      - points: number
             -> number of points for the drone at this moment of the race
      - temps: number
-            -> elapsed time from the beginning of the current lap
+            -> elapsed time from the beginning of the race
      - retard: number or null
             -> delay accumulated over the first overall drone, if relevant
      - tour: number or null
@@ -158,11 +158,11 @@ def leaderboard(*drones):
      - points: number
             -> number of points for the drone at this moment of the race
      - temps: number
-            -> elapsed time from the beginning of the current lap
+            -> time required by the drone to clear the race
      - retard: number or null
             -> delay accumulated over the first overall drone, if relevant
      - tour: number or null
-            -> timing of the last lap for this drone, if relevant
+            -> timing of the best lap for this drone, if relevant
      - finish: bool or null
             -> whether the drone finished the race or was declared dead,
                 if it is not still flying

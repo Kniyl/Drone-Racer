@@ -132,21 +132,24 @@ class Console:
         Check if a drone has a remaining lap to clear and update its status
         accordingly.
         """
+        data = self.extra_data[drone]
         drone = self.scores[drone]
         # Nothing to do if the drone already cleared the race
         if drone['finish'] is not None:
             return
-        pos = drone['position']
-        # FIXME the algorithm is broken and does not account for strict timeouts
-        try:
-            previous, = filter(lambda d: d['position'] == pos-1, self.scores)
-        except ValueError:
-            pass
+        time = self.timer()
+        time -= data['offset'] or 0
+        drone['temps'] = time / 10
+        # Enforce a status if strict timming
+        if self.rules.strict:
+            drone['finish'] = self.rules.nb_laps is None
         else:
-            if previous['tours'] == drone['tours']:
+            drone_lap = drone['tours']
+            min_lap = min(d['tours'] for d in self.scores)
+            if drone_lap != min_lap:
                 drone['finish'] = True
-                rest.update(drone)
-                self.update(drone)
+        rest.update(drone)
+        self.update(drone)
 
     def compute_data(self, gate, drone):
         """React to events on the race as sent by the reader thread and
@@ -159,44 +162,66 @@ class Console:
         if not (gate in self.gates and 0 <= drone < len(self.scores)):
             return
         time = self.timer()
-        time -= data['offset'] or 0
         data = self.extra_data[drone]
-        # FIXME something, somewhere, seems wrong
-        score, pos, delay, turn, on_going, start =\
-                self.rules.compute_score(gate, drone, time)
         drone = self.scores[drone]
-        if start and data['offset'] is None:
+        time -= data['offset'] or 0
+        # Compute state of the drone
+        score, pos, delay, turn, on_going, start = self.rules.compute_score(
+                gate, drone['porte'], drone['id']-1, time)
+        # Drones *must* go through the starting mark so they can claim points
+        if drone['porte'] is None and not start and not self.rules.common_start:
+            return
+        # Store starting informations if the drone goes through
+        # the starting mark for the first time
+        if start:
             data['offset'] = time
             time = 0
             drone['tours'] -= int(turn)
             timer = data['timer']
             if timer:
                 timer.start()
-        else:
-            drone['temps'] = (time - data['time_laps']) / 10
+        # Store general informations
+        drone['temps'] = time / 10
         drone['points'] += score
         drone['porte'] = gate
+        # Compute lap time when the drone goes through the finish line
         if turn:
-            data['time_laps'] = time
             drone['tours'] += 1
-            drone['tour'] = drone['temps']
-            drone['temps'] = 0.0
+            drone['tour'] = time - data['time_laps']
+            data['time_laps'] = time
+            # If the race timed out or the drone performed enough laps
+            # race is cleared
             drone['finish'] = True if (not on_going or
                     self.rules.race_done(drone['tours'])) else None
+        # Account for position change if the gate was able to compute one
         if pos > 0:
-            if pos != drone['position']:
-                drone['retard'] = delay if pos > 1 else 0.0
-                delay = 0.0 if pos> 1 else delay
-                for d in filter(lambda x: x['position'] >= pos, self.scores):
-                    d['position'] += 1
-                    d['retard'] += delay
-                    rest.update(d)
-                    self.update(d)
+            current_position = drone['position']
+            # The drone climbed the leader-board
+            if pos < current_position:
                 drone['position'] = pos
+                drone['retard'] = delay if pos > 1 else 0.0
+                delay = 0.0 if pos > 1 else delay
+                for d in self.scores:
+                    if d['position'] >= pos and d is not drone:
+                        d['position'] += 1
+                        d['retard'] += delay
+                        rest.update(d)
+                        self.update(d)
+            # The drone dropped down the leader-board
+            elif pos > current_position:
+                for d in self.scores:
+                    if current_position > d['position'] >= pos:
+                        d['position'] -= 1
+                        rest.update(d)
+                        self.update(d)
+                drone['position'] = pos
+                drone['retard'] = delay
+            # The drone kept its position
             else:
                 drone['retard'] = delay
         rest.update(drone)
         self.update(drone)
+        # Check if all drones cleared the race
         if not [True for d in self.scores if d['finish'] is None]:
             self.stop_race()
 
@@ -308,7 +333,7 @@ class Rules:
             } for v in gates}
         try:
             for b,v in self.gates.items():
-                self.gates[v['next']]['previous'] = b
+                self.gates[v['next']].setdefault('previous', []).append(b)
         except KeyError:
             raise ConsoleError(
                     'La porte suivant la porte "{0}" '
@@ -325,36 +350,41 @@ class Rules:
             'portes': sorted(self.gates.keys()),
         }
 
-    def compute_score(self, gate, drone, time):
-        """Calcule les points reçus par un drone au passage d’une porte.
+    def compute_score(self, gate, previous, drone, time):
+        """Compute the amount of points given to a drone when it goes
+        through a gate.
 
-        Paramètres:
-         - gate
-            nom de la porte qui vient d’être passée par le drone ;
-         - drone
-            numéro du drone qui vient de franchir la porte ;
-         - time
-            temps mis par le drone pour franchir la porte depuis son départ.
+        Parameters:
+          - gate: identification letter(s) of the gate the drone just reached
+          - previous: identification letter(s) of the previous gate reached
+            by the drone
+          - drone: the ordering index of the drone
+          - time: time since the beginning of the race at which the drone
+            reached the gate
 
-        Retourne un 6-uplet:
-         - nombre de points obtenus au franchissement de la porte ;
-         - position du drone pendant la course ;
-         - retard accumulé sur (avance du) le premier drone ;
-         - indication de tour complété ;
-         - indication de temps limite dépassé ;
-         - indication si le drone passe par la porte de départ.
+        Return a 6-items-sequence:
+          - amount of points awarded for reaching this gate
+          - ranking of the drone at this point of the race
+          - delay accumulated on the leading drone (or advance on the second)
+          - whether or not a lap has been cleared
+          - whether or not the drone has reached its timeout
+          - whether or not the drone reached the starting mark for the first time
         """
-        # FIXME everything is broken here
         gate = self.gates[gate]
         type, pts, times = gate['type'], gate['pts'], gate['times']
-        # Calcul des points
-        start = Gates(type).is_start and not self.common_start
+        # Check if it is the first time this drone goes through the start mark
+        start = previous is None and Gates(type).is_start
+        # Check if the drone cleared a lap
         end = Gates(type).is_end
+        # Compute points
         remaining = self.timeout - time if self.timeout is not None else 0
         running = remaining >= 0
-        pts = Gates(type).is_points and pts or remaining*pts if running else 0
-        # Calcul de position
+        if (previous is None or previous in gate['previous']) and runnig:
+            pts = pts if Gates(type).is_points else remaining*pts
+        else:
+            pts = 0
         pos, delay = -1, 0
+        # Compute position if gate is able to
         if times is not None:
             drone_times = times.setdefault(drone, [])
             drone_times.append(time)
@@ -362,6 +392,9 @@ class Rules:
             everyones_time = sorted(
                     [t[laps] for t in times.values() if len(t) > laps])
             pos = everyones_time.index(time)
+            # if pos is 0 the drone is the fastest for this gate so its delay
+            # should be 0, but we compute the delay of the second drone to be
+            # able to update everyone-else's delay
             if pos:
                 delay = everyones_time[pos] - everyones_time[0]
             elif len(everyones_time) > 1:
@@ -391,4 +424,79 @@ class FreeForAll(Rules):
     """Custom set of rules that does not enforce a specific ordering
     of the gates during the race.
     """
-    pass
+
+    def __init__(self, timeout, strict, nb_laps, gates):
+        """Create a route and check its validity.
+
+        Parameters:
+          - timeout: allotted time to clear the race
+          - strict: should be `True` but is not enforced
+          - nb_laps: not used
+          - gates: list of 4-items-sequences defining the active gates for
+            the race:
+              - identification letter(s) for the gate
+              - kind of gate as defined by the Gates enum
+              - number of points associated to this gate
+              - identification letter(s) for the next gate after this one
+        """
+        # Account for the fact that the timer counts in tenths of seconds
+        # and the timeout value is given in seconds
+        self.timeout = timeout * 10 or None
+        self.strict = True
+        self.nb_laps = None
+        # Check the route validity
+        gates_type = [v[1] for v in gates]
+        # Check that there is at most one starting mark
+        self.common_start = len(b for b in gates_type if Gates(b).is_start)
+        if self.common_start > 1:
+            raise ConsoleError('Trop de portes de départ')
+        # Whether or not all drones share the same timer
+        self.common_start = not self.common_start
+        # Check that there is no finish line
+        if len(b for b in gates_type if Gates(b).is_end):
+            raise ConsoleError(
+                    'Une porte d’arrivée n’a pas de sens dans '
+                    'un contexte où les portes ne sont pas ordonnées')
+        self.gates = {v[0]: {
+                'type': v[1],
+                'pts': v[2],
+            } for v in gates}
+        self.points = {}
+
+    def compute_score(self, gate, previous, drone, time):
+        """Compute the amount of points given to a drone when it goes
+        through a gate.
+
+        Parameters:
+          - gate: identification letter(s) of the gate the drone just reached
+          - previous: identification letter(s) of the previous gate reached
+            by the drone
+          - drone: the ordering index of the drone
+          - time: time since the beginning of the race at which the drone
+            reached the gate
+
+        Return a 6-items-sequence:
+          - amount of points awarded for reaching this gate
+          - ranking of the drone at this point of the race
+          - 0.0 as a delay because it is not relevant
+          - False for clearing a lap because there is no finish line
+          - whether or not the drone has reached its timeout
+          - whether or not the drone reached the starting mark for the first time
+        """
+        gate = self.gates[gate]
+        type, pts = gate['type'], gate['pts']
+        # Check if it is the first time this drone goes through the start mark
+        start = previous is None and Gates(type).is_start
+        # Compute points
+        remaining = self.timeout - time if self.timeout is not None else 0
+        running = remaining >= 0
+        if previous != gate and runnig:
+            pts = pts if Gates(type).is_points else remaining*pts
+        else:
+            pts = 0
+        # Update registered points and compute position
+        total = self.points.get(drone, 0) + pts
+        self.points[drone] = total
+        pos = sorted(self.points.values()).index(total)
+        return pts, pos+1, 0.0, False, running, start
+
