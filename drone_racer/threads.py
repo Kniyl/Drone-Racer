@@ -99,11 +99,12 @@ else:
             self.serial.close()
 
     class XBeeReader:
-        def __init__(self, serial_name, zigbee=False):
+        def __init__(self, serial_name, baudrate=9600, zigbee=False):
             self.name = serial_name
+            self.rate = baudrate
             self._base_cls = ZigBee if zigbee else XBee
 
         def __call__(self, callback):
-            serial = Serial(serial_name)
+            serial = Serial(self.name, self.rate)
             return type('XBeeReader', (_BeeReaderMixin, self._base_cls), {})(
                     serial, callback)
