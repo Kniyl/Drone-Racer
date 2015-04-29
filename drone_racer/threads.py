@@ -114,8 +114,8 @@ else:
 
             Should be called each time a frame is read by the XBee.
             """
-            gate, drone = response_dict['rf_data'].split(b':')
             try:
+                gate, drone = response_dict['rf_data'].split(b':')
                 gate = gate.decode()
                 # Compensate for the drone numbering vs. its indexing
                 drone = int(drone) - 1
