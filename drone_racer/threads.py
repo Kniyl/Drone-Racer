@@ -1,3 +1,5 @@
+# Lots of duck typing in this file, maybe we can try to do better
+
 import os
 import sys
 from threading import Thread
@@ -15,7 +17,7 @@ class BaseReader(Thread):
         """Spawn a thread that continuously read data for drones statuses.
         
         Parameter:
-            update_function: the function that will be called each time a
+          - update_function: the function that will be called each time a
             valid data is read.
         """
         super().__init__(name="reader")
@@ -47,8 +49,8 @@ class BaseReader(Thread):
         """Send input data to the rest of the application.
 
         Parameters:
-            gate: the gate identification letter(s)
-            drone: the drone identification number (1-based)
+          - gate: the gate identification letter(s)
+          - drone: the drone identification number (1-based)
         """
         if drone < 0:
             return
@@ -59,6 +61,9 @@ class StdInReader(BaseReader):
     """Read data from stdin. Primarily used for tests and debug."""
 
     def read_new_value(self):
+        """Read input data and return them as a tuple (gate identifier, drone
+        number). Subclasses must implement this method.
+        """
         raw = input('[@] ').split()
         if len(raw) != 2:
             return '?', -1
@@ -72,13 +77,19 @@ class StdInReader(BaseReader):
 if XBee is None:
     class _BeeReader(BaseReader):
         """Read data from a serial port bound to an XBee.
-        Dummy implementation when xbee module can not be loaded."""
+        Dummy implementation because xbee module could not be loaded.
+        """
 
         def read_new_value(self):
+            """Cancel this thread to avoid burning resources."""
             self._should_continue = False
             return '?', -1
 
     def XBeeReader(*args, **kwargs):
+        """Wrapper around the xbee module to integrate our _BeeReaderMixin
+        into the appropriate base class.
+        Dummy implementation because xbee module could not be loaded.
+        """
         print('xbee module not found. This reader is up to no good',
                 file=sys.stderr)
         return _BeeReader
@@ -87,24 +98,71 @@ else:
         """Read data from a serial port bound to an XBee."""
 
         def __init__(self, serial, callback):
-            super().__init__(serial, callback=self._process_value)
+            """Initialize the XBee reader thanks to the mro.
+
+            Parameters:
+              - serial: the serial port object to read data from
+              - callback: the function that will be called each
+                time a valid data is read.
+            """
             self._update_data = callback
+            super().__init__(serial, callback=self._process_value)
 
         def _process_value(self, response_dict):
-            print(response_dict)
-            self._update_data('A', 0)
+            """Convert a raw data received in a frame by the XBee
+            into suitable data for the application.
+
+            Should be called each time a frame is read by the XBee.
+            """
+            gate, drone = response_dict['rf_data'].split(b':')
+            try:
+                gate = gate.decode()
+                # Compensate for the drone numbering vs. its indexing
+                drone = int(drone) - 1
+            except (UnicodeError, ValueError) as e:
+                print('Le message', response_dict['rf_data'],
+                        'a été reçu mais n’est pas compris par l’application.',
+                        file=sys.stderr)
+                print(e, file=sys.stderr)
+            else:
+                self._update_data(gate, drone)
 
         def stop(self):
+            """Halt the thread from reading its input and close the
+            underlying serial port.
+            """
             self.halt()
             self.serial.close()
 
     class XBeeReader:
-        def __init__(self, serial_name, baudrate=9600, zigbee=False):
-            self.name = serial_name
-            self.rate = baudrate
+        """Wrapper around the xbee module to integrate our _BeeReaderMixin
+        into the appropriate base class.
+        """
+
+        def __init__(self, *args, **kwargs):
+            """Save parameters for future use.
+            Everything is used to initialize a serial.Serial object
+            except for the named attribute 'zigbee' which define the
+            base class to use.
+
+            Parameter:
+              - zigbee: whether to use the xbee.ZigBee base class or
+                the xbee.XBee one
+            """
+            zigbee = kwargs.pop('zigbee', False)
+            self._args = args
+            self._kwargs = kwargs
             self._base_cls = ZigBee if zigbee else XBee
 
         def __call__(self, callback):
-            serial = Serial(self.name, self.rate)
+            """Generate the appropriate class to read data.
+
+            Parameter:
+              - callback: the function that will be called each
+                time a valid data is read.
+            """
+            serial = Serial(*self._args, **self._kwargs)
+            self._args = None
+            self._kwargs = None
             return type('XBeeReader', (_BeeReaderMixin, self._base_cls), {})(
                     serial, callback)
