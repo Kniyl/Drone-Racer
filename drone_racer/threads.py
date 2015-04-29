@@ -2,9 +2,10 @@ import os
 import sys
 from threading import Thread
 try:
-    from RPi import GPIO
+    from serial import Serial
+    from xbee import XBee, ZigBee
 except ImportError:
-    GPIO = None
+    XBee = None
 
 
 class BaseReader(Thread):
@@ -18,8 +19,8 @@ class BaseReader(Thread):
             valid data is read.
         """
         super().__init__(name="reader")
-        self.update_data = update_function
-        self.should_continue = True
+        self._update_data = update_function
+        self._should_continue = True
         self.start()
 
     def run(self):
@@ -28,13 +29,13 @@ class BaseReader(Thread):
         Wait for data, read them and send them to the rest of the application
         for further computation.
         """
-        while self.should_continue:
+        while self._should_continue:
             gate, drone = self.read_new_value()
-            self.process_value(gate, drone)
+            self._process_value(gate, drone)
 
     def stop(self):
         """Signal that the thread has to stop reading its inputs."""
-        self.should_continue = False
+        self._should_continue = False
 
     def read_new_value(self):
         """Read input data and return them as a tuple (gate identifier, drone
@@ -42,7 +43,7 @@ class BaseReader(Thread):
         """
         raise NotImplementedError("Subclasses must implement this method")
 
-    def process_value(self, gate, drone):
+    def _process_value(self, gate, drone):
         """Send input data to the rest of the application.
 
         Parameters:
@@ -51,7 +52,7 @@ class BaseReader(Thread):
         """
         if drone < 0:
             return
-        self.update_data(gate, drone)
+        self._update_data(gate, drone)
 
 
 class StdInReader(BaseReader):
@@ -68,21 +69,41 @@ class StdInReader(BaseReader):
         return value
 
 
-if GPIO is None:
-    from time import sleep
-
-    class GPIOReader(BaseReader):
-        """Read data from GPIO.
-        Dummy implementation on non-raspberrypi systems."""
+if XBee is None:
+    class _BeeReader(BaseReader):
+        """Read data from a serial port bound to an XBee.
+        Dummy implementation when xbee module can not be loaded."""
 
         def read_new_value(self):
-            while self.should_continue:
-                sleep(1)
+            self._should_continue = False
             return '?', -1
+
+    def XBeeReader(*args, **kwargs):
+        print('xbee module not found. This reader is up to no good',
+                file=sys.stderr)
+        return _BeeReader
 else:
-    class GPIOReader(BaseReader):
-        """Read data from GPIO."""
+    class _BeeReaderMixin:
+        """Read data from a serial port bound to an XBee."""
 
-        def read_new_value(self):
-            # TODO: actually read data
-            return '?', -1
+        def __init__(self, serial, callback):
+            super().__init__(serial, callback=self._process_value)
+            self._update_data = callback
+
+        def _process_value(self, response_dict):
+            print(response_dict)
+            self._update_data('A', 0)
+
+        def stop(self):
+            self.halt()
+            self.serial.close()
+
+    class XBeeReader:
+        def __init__(self, serial_name, zigbee=False):
+            self.name = serial_name
+            self._base_cls = ZigBee if zigbee else XBee
+
+        def __call__(self, callback):
+            serial = Serial(serial_name)
+            return type('XBeeReader', (_BeeReaderMixin, self._base_cls), {})(
+                    serial, callback)

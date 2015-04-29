@@ -5,5 +5,6 @@ parser = ArgumentParser(description='Interface graphique "Drone Racer"')
 parser.add_argument('--fancy-title', dest='fancy', action='store_true',
                     help='Utilise une barre de titre un peu plus Gtk3')
 args = parser.parse_args()
-app = drone_racer.Application(drone_racer.DataReader, args.fancy)
+reader = drone_racer.XBeeReader('/dev/ttyAMA0', zigbee=True)
+app = drone_racer.Application(reader, args.fancy)
 app.run()
