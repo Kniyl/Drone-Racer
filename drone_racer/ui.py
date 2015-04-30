@@ -731,7 +731,7 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         panel = Gtk.VBox(spacing=6)
         panel.pack_start(self.label_warmup, True, False, 4)
         treeview = Gtk.TreeView(model=self.update_box)
-        titles = [
+        titles = (
             'Balise',
             'Pilote',
             'Drone',
@@ -742,7 +742,7 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
             'Retard',
             'Dernier tour',
             'Porte',
-        ]
+        )
         for i, title in enumerate(titles):
             renderer = Gtk.CellRendererText(xalign=0.5)
             column = Gtk.TreeViewColumn(title, renderer, text=i)
@@ -871,19 +871,76 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
             dropdown.append_text(driver)
         row.pack_start(dropdown, True, True, 4)
         panel.pack_start(row, True, False, 4)
-        row = Gtk.HBox()
+        row = Gtk.VBox(spacing=6)
         panel.pack_start(row, True, False, 4)
+        liststore = Gtk.ListStore(str, str, str, str, str, str, str, str)
+        treeview = Gtk.TreeView(liststore)
+        titles = (
+            'Drone',
+            'Category',
+            'Place',
+            'Points',
+            'Temps',
+            'Tours',
+            'Meilleur tour',
+        )
+        for i, title in enumerate(titles):
+            renderer = Gtk.CellRendererText(xalign=0.5)
+            column = Gtk.TreeViewColumn(title, renderer, text=i)
+            column.set_alignment(0.5)
+            column.set_sort_column_id(i)
+            column.set_expand(i in (1,2))
+            treeview.append_column(column)
+        index = len(titles)
+        renderer = Gtk.CellRendererText(xalign=0.5)
+        renderer.props.font_desc = Pango.FontDescription('FontAwesome')
+        column = Gtk.TreeViewColumn('Status', renderer, text=index)
+        column.set_alignment(0.5)
+        column.set_sort_column_id(index)
+        treeview.append_column(column)
         scroll = Gtk.ScrolledWindow(vexpand=True, hexpand=True)
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         scroll.set_min_content_height(200)
-        scroll.add(Gtk.Label('--- En attente de la sélection d’un pilote ---'))
+        scroll.add(treeview)
         panel.pack_start(scroll, True, False, 4)
         def update(widget):
-            scroll.get_child().destroy()
-            scroll.add(Gtk.Label(widget.get_active_text()))
-            scroll.show_all()
             row.foreach(lambda w: w.destroy())
-            row.add(Gtk.Label('bite'))
+            liststore.clear()
+            points, races, bests = 0, 0, {}
+            for drone, cat, pos, pts, time, laps, best, status, race in\
+                    self.db.get_races_for_driver(widget.get_active_text()):
+                if pts is None:
+                    # Race has been cancelled
+                    liststore.append([drone, cat, '-', '-', '-', '-', '-', '-'])
+                else:
+                    time = '{:02.0f}:{:04.1f}'.format(*divmod(time, 60))
+                    if best:
+                        bests[race] = min(bests.get(race) or time, best)
+                        best = '{:02.0f}:{:04.1f}'.format(*divmod(best, 60))
+                    else:
+                        bests.setdefault(race, None)
+                        best = '-'
+                    finish = finish and '\uf11e' or '\uf0f9'
+                    liststore.append([drone, cat, str(pos), str(pts),
+                        time, str(laps), best, finish])
+                    points += pts
+                    races += 1
+            scroll.show_all()
+            label = Gtk.Label('Score total : {}'.format(points))
+            row.pack_start(label, True, False, 4)
+            label = Gtk.Label('Nombre de courses : {}'.format(races))
+            row.pack_start(label, True, False, 4)
+            label = Gtk.Label('Nombre de jeux : {}'.format(len(bests)))
+            row.pack_start(label, True, False, 4)
+            events = {}
+            for race, best in bests.items():
+                name, event = self.db.get_race_name(race)
+                events[event] = True
+                label = Gtk.Label('Meilleur temps pour {} ({}) : {}'.format(
+                    name, event, best or '—'))
+                row.pack_start(label, True, False, 4)
+            label = Gtk.Label('Nombre d’évènements : {}'.format(len(events)))
+            row.pack_start(label, True, False, 4)
             row.show_all()
         dropdown.connect('changed', update)
         return panel

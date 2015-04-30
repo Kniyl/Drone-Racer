@@ -82,8 +82,9 @@ class Database:
                             'balise_id integer NOT NULL, '
                             'position integer, '
                             'points integer, '
-                            'temps integer, '
+                            'temps real, '
                             'tours integer, '
+                            'best real, '
                             'termine boolean, '
                             'retard integer, '
                             'FOREIGN KEY(course_id) REFERENCES courses(id), '
@@ -351,6 +352,14 @@ class Database:
         query = 'SELECT intitule FROM jeux WHERE event_id=?'
         return (row[0] for row in self._execute(query, self.id))
 
+    def get_game_name(self, game_id):
+        """Fetch the name of the given set of custom rules."""
+        query = 'SELECT intitule, event_id FROM jeux WHERE id=?'
+        name, event_id = self._execute(query, game_id).fetchone()
+        query = 'SELECT nom FROM events WHERE id=?'
+        event, = self._execute(query, event_id).fetchone()
+        return name, event
+
     def get_game_settings(self, game_name):
         """Fetch a specific route and set of rules from the event bound to
         this object.
@@ -396,6 +405,15 @@ class Database:
             result.append((id, driver, drone))
         return result
 
+    def get_races_for_driver(self, driver_name):
+        query = 'SELECT id FROM pilotes WHERE nom=?'
+        driver, = self._execute(query, driver_name).fetchone()
+        query = 'SELECT designation, category, position, points, temps, '\
+                'tours, best, termine, jeu_id FROM coureurs INNER JOIN '\
+                'drones ON coureurs.drone_id=drones.id INNER JOIN '\
+                'courses ON coureurs.course_id=courses.id WHERE pilote_id=?'
+        return self._execute(query, driver).fetchall()
+
     def update_race(self, race_id, *drivers_status):
         """Updates the informations on a given race to create a leader-board
         when it is done.
@@ -409,15 +427,16 @@ class Database:
               - points: points earned by the drone during the race
               - temps: amount of time needed by the drone to clear the race
               - tours: number of laps achieved at the end of the race
+              - tour: best laps' time
               - finish: whether or not the drone did finish the race
               - retard: delay accumulated on the leader drone, if relevant
         """
         query = 'UPDATE coureurs SET position=?, points=?, temps=?, tours=?, '\
-                'termine=?, retard=? WHERE course_id=? and balise_id=?'
+                'best=?, termine=?, retard=? WHERE course_id=? and balise_id=?'
         for info in drivers_status:
             self._execute(query, info['position'], info['points'],
-                    info['temps'], info['tours'], info['finish'],
-                    info['retard'], race_id, info['id'])
+                    info['temps'], info['tours'], info['tour'],
+                    info['finish'], info['retard'], race_id, info['id'])
 
     def set_category_for_drone(self, drone, category):
         """Change the category associated to a given kind of drone.

@@ -73,6 +73,7 @@ class Console:
             drone['points'] = None
             drone['temps'] = None
             drone['tours'] = None
+            drone['tour'] = None
             drone['finish'] = False
             drone['retard'] = None
         # Cancel each drone's timer if there was a time limit
