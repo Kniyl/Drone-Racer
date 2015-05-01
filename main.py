@@ -1,5 +1,10 @@
+import os
+
 from argparse import ArgumentParser
 import drone_racer
+
+
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 parser = ArgumentParser(description='Interface graphique "Drone Racer"')
 parser.add_argument('--fancy-title', dest='fancy', action='store_true',
