@@ -188,7 +188,7 @@ class Console:
         # Compute lap time when the drone goes through the finish line
         if turn:
             drone['tours'] += 1
-            drone['tour'] = time - data['time_laps']
+            drone['tour'] = (time - data['time_laps']) / 10
             data['time_laps'] = time
             # If the race timed out or the drone performed enough laps
             # race is cleared
@@ -315,13 +315,13 @@ class Rules:
         # Check the route validity
         gates_type = [v[1] for v in gates]
         # Check that there is at most one starting mark
-        self.common_start = len(b for b in gates_type if Gates(b).is_start)
+        self.common_start = len([b for b in gates_type if Gates(b).is_start])
         if self.common_start > 1:
             raise ConsoleError('Trop de portes de départ')
         # Whether or not all drones share the same timer
         self.common_start = not self.common_start
         # Check that there is one and only one finish line
-        if len(b for b in gates_type if Gates(b).is_end) != 1:
+        if len([b for b in gates_type if Gates(b).is_end]) != 1:
             raise ConsoleError('Une (et une seule) ligne d’arrivée '
                                'doit être définie')
         # Check for the route ordering
@@ -380,7 +380,7 @@ class Rules:
         # Compute points
         remaining = self.timeout - time if self.timeout is not None else 0
         running = remaining >= 0
-        if (previous is None or previous in gate['previous']) and runnig:
+        if (previous is None or previous in gate['previous']) and running:
             pts = pts if Gates(type).is_points else remaining*pts
         else:
             pts = 0
@@ -448,13 +448,13 @@ class FreeForAll(Rules):
         # Check the route validity
         gates_type = [v[1] for v in gates]
         # Check that there is at most one starting mark
-        self.common_start = len(b for b in gates_type if Gates(b).is_start)
+        self.common_start = len([b for b in gates_type if Gates(b).is_start])
         if self.common_start > 1:
             raise ConsoleError('Trop de portes de départ')
         # Whether or not all drones share the same timer
         self.common_start = not self.common_start
         # Check that there is no finish line
-        if len(b for b in gates_type if Gates(b).is_end):
+        if len([b for b in gates_type if Gates(b).is_end]):
             raise ConsoleError(
                     'Une porte d’arrivée n’a pas de sens dans '
                     'un contexte où les portes ne sont pas ordonnées')

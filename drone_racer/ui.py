@@ -135,6 +135,8 @@ class DroneRacer(Gtk.Application):
                 self._show_dialog, 'game_dialog')
         self._connect_action('stats_driver', self._create_dialog,
                 'Statistiques de pilotes', self.window.create_stats_drivers)
+        self._connect_action('stats_game', self._create_dialog,
+                'Statistiques de jeux', self.window.create_stats_games)
 
     def on_activate(self, app):
         """React to the 'activate' signal. Show the main window to the user."""
@@ -275,6 +277,10 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         self.game_dropdown.connect('changed', self._on_game_change)
         self.game_dropdown_dialog = Gtk.ComboBoxText.new_with_entry()
         self.game_dropdown_dialog.connect('changed', self._on_game_change)
+        self.game_row1 = Gtk.HBox()
+        self.game_row1_dialog = Gtk.HBox()
+        self.game_row2 = Gtk.HBox()
+        self.game_row2_dialog = Gtk.HBox()
         self.game_box = Gtk.VBox(spacing=6)
         self.game_box_dialog = Gtk.VBox(spacing=6)
         self.race_dropdown = Gtk.ComboBoxText()
@@ -491,32 +497,34 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         if dialog_response:
             dropdown = self.game_dropdown_dialog
             box = self.game_box_dialog
+            row1 = self.game_row1_dialog
+            row2 = self.game_row2_dialog
         else:
             dropdown = self.game_dropdown
             box = self.game_box
+            row1 = self.game_row1
+            row2 = self.game_row2
         panel = Gtk.VBox(spacing=6)
         row = Gtk.HBox()
         row.pack_start(Gtk.Label('Nom du jeu'), False, False, 4)
         row.pack_start(dropdown, True, True, 4)
         panel.pack_start(row, True, False, 4)
-        row = Gtk.HBox()
-        row.pack_start(Gtk.Label('Nombre maximum de pilotes'), False, False, 4)
+        row1.pack_start(Gtk.Label('Nombre maximum de pilotes'), False, False, 4)
         nb_drivers = Gtk.Entry()
-        row.pack_start(nb_drivers, True, True, 4)
-        row.pack_start(Gtk.Label('Circuit ordonné'), False, False, 4)
+        row1.pack_start(nb_drivers, True, True, 4)
+        row1.pack_start(Gtk.Label('Circuit ordonné'), False, False, 4)
         enforce_order = Gtk.Switch(state=False)
-        row.pack_start(enforce_order, False, False, 4)
-        panel.pack_start(row, True, False, 4)
-        row = Gtk.HBox()
-        row.pack_start(Gtk.Label('Secondes disponibles'), False, False, 4)
+        row1.pack_start(enforce_order, False, False, 4)
+        panel.pack_start(row1, True, False, 4)
+        row2.pack_start(Gtk.Label('Secondes disponibles'), False, False, 4)
         time = Gtk.Entry()
-        row.pack_start(time, True, True, 4)
+        row2.pack_start(time, True, True, 4)
         strict = Gtk.CheckButton(label='strict', active=True, sensitive=False)
-        row.pack_start(strict, False, False, 4)
-        row.pack_start(Gtk.Label('Nombre de tour à réaliser'), False, False, 4)
+        row2.pack_start(strict, False, False, 4)
+        row2.pack_start(Gtk.Label('Nombre de tour à réaliser'), False, False, 4)
         laps = Gtk.Entry()
-        row.pack_start(laps, True, True, 4)
-        panel.pack_start(row, True, False, 4)
+        row2.pack_start(laps, True, True, 4)
+        panel.pack_start(row2, True, False, 4)
         panel.pack_start(box, True, False, 4)
         def enforce_strict(widget, gparam):
             if widget.get_active():
@@ -532,10 +540,15 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
             self.game_dropdown_dialog.set_active(-1)
             self.game_dropdown.get_child().set_text('')
             self.game_dropdown_dialog.get_child().set_text('')
-            nb_drivers.set_text('')
-            enforce_order.set_active(False)
-            time.set_text('')
-            laps.set_text('')
+            for row in (self.game_row1, self.game_row1_dialog):
+                d, e = row.get_children()[1:4:2]
+                d.set_text('')
+                e.set_active(False)
+            for row in (self.game_row2, self.game_row2_dialog):
+                t, s, _, l = row.get_children()[1:5]
+                t.set_text('')
+                s.set_active(True)
+                l.set_text('')
             if dialog_response:
                 dialog_response(0)
             else:
@@ -551,7 +564,7 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
                 dialog.destroy()
                 return
             try:
-                nb_drones = int(nb_driver.get_text() or '0')
+                nb_drones = int(nb_drivers.get_text() or '0')
                 race_time = int(time.get_text() or '0')
                 race_laps = int(laps.get_text() or '0')
             except ValueError:
@@ -774,14 +787,14 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
             self.label_warmup.modify_font(self.label_font)
             self.activate_loaded()
         def close_race(widget):
-            self.race_id = None
             self.label_warmup.modify_font(self.label_font)
+            self.db.update_race(self.race_id, *self.console.scores)
             rest.leaderboard(*self.console.scores)
+            self.race_id = None
             self.activate_loaded()
         def stop_race(widget):
             widget.hide()
             self.console.stop_race()
-            self.db.update_race(self.race_id, *self.console.scores)
             cancel, close = self.button_box.get_children()[1:3]
             cancel.hide()
             close.show_all()
@@ -794,6 +807,7 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
             stop.show_all()
             self.label_warmup.set_text('')
             self.label_warmup.modify_font(Pango.FontDescription('40'))
+            self.label_warmup.set_text('ATTENTION !')
             GLib.timeout_add_seconds(1, self.show_countdown)
         buttons_setup = (
             ('Démarrer', 'media-playback-start', launch_race),
@@ -873,11 +887,14 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         panel.pack_start(row, True, False, 4)
         row = Gtk.VBox(spacing=6)
         panel.pack_start(row, True, False, 4)
-        liststore = Gtk.ListStore(str, str, str, str, str, str, str, str)
+        liststore = Gtk.ListStore(
+                str, str, str, str, str, str, str, str, str, str)
         treeview = Gtk.TreeView(liststore)
         titles = (
             'Drone',
             'Category',
+            'Jeu',
+            'Évènement',
             'Place',
             'Points',
             'Temps',
@@ -909,20 +926,24 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
             points, races, bests = 0, 0, {}
             for drone, cat, pos, pts, time, laps, best, status, race in\
                     self.db.get_races_for_driver(widget.get_active_text()):
+                game, event = self.db.get_game_name(race)
                 if pts is None:
                     # Race has been cancelled
-                    liststore.append([drone, cat, '-', '-', '-', '-', '-', '-'])
+                    liststore.append([
+                        drone, cat, game, event, '-',
+                        '-', '-', '-', '-', '-'])
                 else:
-                    time = '{:02.0f}:{:04.1f}'.format(*divmod(time, 60))
                     if best:
                         bests[race] = min(bests.get(race) or time, best)
                         best = '{:02.0f}:{:04.1f}'.format(*divmod(best, 60))
                     else:
                         bests.setdefault(race, None)
                         best = '-'
-                    finish = finish and '\uf11e' or '\uf0f9'
-                    liststore.append([drone, cat, str(pos), str(pts),
-                        time, str(laps), best, finish])
+                    time = '{:02.0f}:{:04.1f}'.format(*divmod(time, 60))
+                    status = status and '\uf11e' or '\uf0f9'
+                    liststore.append([
+                        drone, cat, game, event, str(pos),
+                        str(pts), time, str(laps), best, status])
                     points += pts
                     races += 1
             scroll.show_all()
@@ -932,14 +953,100 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
             row.pack_start(label, True, False, 4)
             label = Gtk.Label('Nombre de jeux : {}'.format(len(bests)))
             row.pack_start(label, True, False, 4)
-            events = {}
+            events = set()
             for race, best in bests.items():
-                name, event = self.db.get_race_name(race)
-                events[event] = True
-                label = Gtk.Label('Meilleur temps pour {} ({}) : {}'.format(
-                    name, event, best or '—'))
+                name, event = self.db.get_game_name(race)
+                events.add(event)
+                label = Gtk.Label(
+                    'Meilleur temps pour {} ({}) : {:02.0f}:{:04.1f}'.format(
+                    name, event, *divmod(best or -648.9, 60)))
                 row.pack_start(label, True, False, 4)
             label = Gtk.Label('Nombre d’évènements : {}'.format(len(events)))
+            row.pack_start(label, True, False, 4)
+            row.show_all()
+        dropdown.connect('changed', update)
+        return panel
+
+    def create_stats_games(self):
+        panel = Gtk.VBox(spacing=6)
+        row = Gtk.HBox()
+        row.pack_start(Gtk.Label('Type de jeu'), False, False, 4)
+        dropdown = Gtk.ComboBoxText()
+        for game in self.db.get_game_names():
+            dropdown.append_text(game)
+        row.pack_start(dropdown, True, True, 4)
+        panel.pack_start(row, True, False, 4)
+        row = Gtk.VBox(spacing=6)
+        panel.pack_start(row, True, False, 4)
+        liststore = Gtk.ListStore(str, str, str, str, str, str, str, str, str)
+        treeview = Gtk.TreeView(liststore)
+        titles = (
+            'Pilote',
+            'Drone',
+            'Category',
+            'Place',
+            'Points',
+            'Temps',
+            'Tours',
+            'Meilleur tour',
+        )
+        for i, title in enumerate(titles):
+            renderer = Gtk.CellRendererText(xalign=0.5)
+            column = Gtk.TreeViewColumn(title, renderer, text=i)
+            column.set_alignment(0.5)
+            column.set_sort_column_id(i)
+            column.set_expand(i in (1,2))
+            treeview.append_column(column)
+        index = len(titles)
+        renderer = Gtk.CellRendererText(xalign=0.5)
+        renderer.props.font_desc = Pango.FontDescription('FontAwesome')
+        column = Gtk.TreeViewColumn('Status', renderer, text=index)
+        column.set_alignment(0.5)
+        column.set_sort_column_id(index)
+        treeview.append_column(column)
+        scroll = Gtk.ScrolledWindow(vexpand=True, hexpand=True)
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll.set_min_content_height(200)
+        scroll.add(treeview)
+        panel.pack_start(scroll, True, False, 4)
+        def update(widget):
+            row.foreach(lambda w: w.destroy())
+            liststore.clear()
+            best_score, best_time = (None, None), (None, None)
+            total, races = 0, set()
+            for name, drone, cat, pos, pts, time, laps, best, status, race in\
+                    self.db.get_races_for_game(widget.get_active_text()):
+                if pts is None:
+                    # Race has been cancelled
+                    liststore.append([
+                        name, drone, cat, '-',
+                        '-', '-', '-', '-', '-'])
+                else:
+                    if best_time[0] is None or time < best_time[0]:
+                        best_time = (time, name)
+                    if best_score[0] is None or pts > best_score[0]:
+                        best_score = (pts, name)
+                    time = '{:02.0f}:{:04.1f}'.format(*divmod(time, 60))
+                    if best:
+                        best = '{:02.0f}:{:04.1f}'.format(*divmod(best, 60))
+                    else:
+                        best = '-'
+                    status = status and '\uf11e' or '\uf0f9'
+                    liststore.append([
+                        name, drone, cat, str(pos), str(pts),
+                        time, str(laps), best, status])
+                    total += 1
+                    races.add(race)
+            scroll.show_all()
+            label = Gtk.Label(
+                    'Meilleur pilote : {1} ({0} points)'.format(*best_score))
+            row.pack_start(label, True, False, 4)
+            label = Gtk.Label(
+                    'Meilleur pilote : {} ({:02.0f}:{:04.1f})'.format(
+                        best_time[1], *divmod(best_time[0] or 0, 60)))
+            row.pack_start(label, True, False, 4)
+            label = Gtk.Label('{} participants au total sur {} courses'.format(
+                total, len(races)))
             row.pack_start(label, True, False, 4)
             row.show_all()
         dropdown.connect('changed', update)
@@ -1021,7 +1128,8 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
             self.game_dropdown.append_text(game)
             self.game_dropdown_dialog.append_text(game)
             self.race_dropdown.append_text(game)
-        self._add_beacon_row()
+        self._add_beacon_row(parent=self.game_box)
+        self._add_beacon_row(parent=self.game_box_dialog)
 
     def _clear_dropdown_values(self):
         self.driver_dropdown.set_active(-1)
@@ -1120,54 +1228,41 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
             game_name = widget.get_active_text()
             drones, time, laps, free, strict, registered_beacons =\
                     self.db.get_game_settings(game_name)
-            row1, row2 = self.game_box.get_parent().get_parent(
-                    ).get_children()[1:3]
-            drone, enforce = row1.get_children()[1:4:2]
-            drone.set_text(str(drones))
-            enforce.set_active(not free)
-            time_box, strict_box, _, laps_box = row2.get_children()[1:5]
-            time_box.set_text(str(time))
-            strict_box.set_state(strict)
-            laps_box.set_text(str(laps))
-            row1, row2 = self.game_box_dialog.get_parent().get_parent(
-                    ).get_children()[1:3]
-            drone, enforce = row1.get_children()[1:4:2]
-            drone.set_text(str(drones))
-            enforce.set_active(not free)
-            time_box, strict_box, _, laps_box = row2.get_children()[1:5]
-            time_box.set_text(str(time))
-            strict_box.set_state(strict)
-            laps_box.set_text(str(laps))
-            self._add_beacon_row()
+            for row in (self.game_row1, self.game_row1_dialog):
+                drone, enforce = row.get_children()[1:4:2]
+                drone.set_text(str(drones))
+                enforce.set_active(not free)
+            for row in (self.game_row2, self.game_row2_dialog):
+                time_box, strict_box, _, laps_box = row.get_children()[1:5]
+                time_box.set_text(str(time))
+                strict_box.set_active(strict)
+                laps_box.set_text(str(laps))
+            self._add_beacon_row(parent=self.game_box)
+            self._add_beacon_row(parent=self.game_box_dialog)
             for b, t, v, n in registered_beacons:
                 current = self.beacon_names.index(b)
                 next_one = self.beacon_names.index(n)
                 points = str(v)
-                row = self.game_box.get_children()[-1]
-                _, bb, _, tt, _, vv, _, nn, _ = row.get_children()
-                bb.set_active(current)
-                tt.set_active(t)
-                vv.set_text(points)
-                nn.set_active(next_one)
-                row = self.game_box_dialog.get_children()[-1]
-                _, bb, _, tt, _, vv, _, nn, _ = row.get_children()
-                bb.set_active(current)
-                tt.set_active(t)
-                vv.set_text(points)
-                nn.set_active(next_one)
+                for box in (self.game_box, self.game_box_dialog):
+                    row = box.get_children()[-1]
+                    _, bb, _, tt, _, vv, _, nn, _ = row.get_children()
+                    bb.set_active(current)
+                    tt.set_active(t)
+                    vv.set_text(points)
+                    nn.set_active(next_one)
         elif not (len(self.game_box.get_children()) and
                 len(self.game_box_dialog.get_children())):
-            self._add_beacon_row()
+            self._add_beacon_row(parent=self.game_box)
+            self._add_beacon_row(parent=self.game_box_dialog)
 
-    def _add_beacon_row(self, widget=None):
-        widget_parent = (self.game_box, self.game_box_dialog)
+    def _add_beacon_row(self, widget=None, parent=None):
+        panel = None
+        if parent:
+            panel = parent
         if widget:
             widget.disconnect_by_func(self._add_beacon_row)
-            if widget.get_parent().get_parent() is self.game_box:
-                widget_parent = (self.game_box,)
-            else:
-                widget_parent = (self.game_box_dialog,)
-        for panel in widget_parent:
+            panel = widget.get_parent().get_parent()
+        if panel:
             row = Gtk.HBox()
             row.pack_start(Gtk.Label('Porte'), False, False, 4)
             dropdown = Gtk.ComboBoxText()
@@ -1193,9 +1288,9 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
                 dropdown.append_text(name)
             row.pack_start(dropdown, False, False, 4)
             button = Gtk.Button(image=Gtk.Image(icon_name='window-close'))
-            button.connect('clicked',
-                    lambda w: row.destroy() or (self._add_beacon_row()
-                        if not len(panel.get_children()) else None))
+            button.connect('clicked', lambda w: row.destroy() or (
+                self._add_beacon_row(parent=panel) if not
+                len(panel.get_children()) else None))
             row.pack_start(button, False, False, 4)
             panel.pack_start(row, True, False, 4)
             panel.show_all()

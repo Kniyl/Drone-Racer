@@ -414,6 +414,16 @@ class Database:
                 'courses ON coureurs.course_id=courses.id WHERE pilote_id=?'
         return self._execute(query, driver).fetchall()
 
+    def get_races_for_game(self, game_name):
+        query = 'SELECT id FROM jeux WHERE intitule=?'
+        game, = self._execute(query, game_name).fetchone()
+        query = 'SELECT nom, designation, category, position, points, temps, '\
+                'tours, best, termine, course_id FROM coureurs INNER JOIN '\
+                'drones ON coureurs.drone_id=drones.id INNER JOIN '\
+                'pilotes ON coureurs.pilote_id=pilotes.id INNER JOIN '\
+                'courses ON coureurs.course_id=courses.id WHERE jeu_id=?'
+        return self._execute(query, game).fetchall()
+
     def update_race(self, race_id, *drivers_status):
         """Updates the informations on a given race to create a leader-board
         when it is done.
