@@ -491,7 +491,7 @@ class FreeForAll(Rules):
         # Compute points
         remaining = self.timeout - time if self.timeout is not None else 0
         running = remaining >= 0
-        if previous != gate and runnig:
+        if previous != gate and running:
             pts = pts if Gates(type).is_points else remaining*pts
         else:
             pts = 0

@@ -1,4 +1,4 @@
-from gi.repository import Gtk, GLib, Gio, Gdk, Pango
+from gi.repository import Gtk, GLib, Gio, Gdk, Pango, GdkPixbuf
 from threading import Timer
 
 from .threads import StdInReader
@@ -51,6 +51,7 @@ class WaitDialog(UserDialog):
           - main_text: the important but short message displayed by the dialog
           - secondary_text: a longer explanation for the main_text message
         """
+        # Save content before building the dialog out of it
         self._main = main_text
         self._secondary = secondary_text
         super().__init__(parent, 'Oups', None)
@@ -59,6 +60,7 @@ class WaitDialog(UserDialog):
         """Return the content to display in the dialog."""
         hbox = Gtk.HBox()
         vbox = Gtk.VBox(spacing=1)
+        # Put some space around the text for eye-candyness
         vbox.set_margin_top(10)
         vbox.set_margin_bottom(10)
         vbox.set_margin_right(10)
@@ -99,11 +101,20 @@ class DroneRacer(Gtk.Application):
         # Save window parameters for later use
         self.window_setup = (reader, fancy)
 
-        self.connect('startup', self.on_startup)
-        self.connect('activate', self.on_activate)
-        self.connect('shutdown', self.on_shutdown)
+        self.connect('startup', self._on_startup)
+        self.connect('activate', self._on_activate)
+        self.connect('shutdown', self._on_shutdown)
 
-    def on_startup(self, app):
+    def maximize_window(self, maximize):
+        """Toggle maximized state of the window at the application
+        level. Usefull for letting the user choose its initial state.
+        """
+        if maximize:
+            self.window.maximize()
+        else:
+            self.window.unmaximize()
+
+    def _on_startup(self, app):
         """React to the 'startup' signal.
 
         Build the main window, its menu bar and create actions to react to
@@ -121,7 +132,7 @@ class DroneRacer(Gtk.Application):
         self._connect_action('win_new_dialog', self.window.new_database)
         self._connect_action('win_open_dialog', self.window.open_database)
         self._connect_action('win_close', self.window.close_database)
-        self._connect_action('quit', lambda a,u: self.quit())
+        self._connect_action('quit', self.close_application)
         self._connect_action('rest', self._manage_rest_server)
 
         # Connect database dependent menu items
@@ -138,11 +149,11 @@ class DroneRacer(Gtk.Application):
         self._connect_action('stats_game', self._create_dialog,
                 'Statistiques de jeux', self.window.create_stats_games)
 
-    def on_activate(self, app):
+    def _on_activate(self, app):
         """React to the 'activate' signal. Show the main window to the user."""
         self.window.show_all()
 
-    def on_shutdown(self, app):
+    def _on_shutdown(self, app):
         """React to the 'shutdown' signal. Sweep remaining data from the
         application before leaving.
         """
@@ -219,6 +230,11 @@ class DroneRacer(Gtk.Application):
             rest._REST_ADDR = entry.get_text()
         dialog.destroy()
 
+    def close_application(self, action, user_data):
+        """Close the application on behalf of the user."""
+        self.window.hide()
+        self.release() # self.quit() is too fast, window is still showing
+
         
 class DroneRacerWindow(Gtk.ApplicationWindow):
     """Main window for the application. Manage everything, gather all the
@@ -245,21 +261,17 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         Gtk.ApplicationWindow.__init__(self,
                 title='Drone Racer', application=application)
         self.set_border_width(0)
-        self.set_default_size(900, 400)
         self.override_background_color(Gtk.StateFlags.NORMAL,
                 Gdk.RGBA(1, 1, 1, 1))
-        #self.maximize()
-
         if fancy:
             header = Gtk.HeaderBar(title='Drone Racer')
-            header.set_subtitle('Bienvenue')
             header.props.show_close_button = True
             header.set_border_width(0)
             self.set_titlebar(header)
             self.set_custom_title = header.set_subtitle
         else:
-            self.set_custom_title =\
-                    lambda text: self.set_title(text + ' | Drone Racer')
+            self.set_custom_title = lambda text: self.set_title(
+                                        text + ' | Drone Racer')
 
         # Widgets shared between several functions
         self.event_dropdown = Gtk.ComboBoxText.new_with_entry()
@@ -309,8 +321,15 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         self.main.set_homogeneous(True)
         self.add(self.main)
 
-        self.main.add_named(
-                Gtk.Image.new_from_file('resources/img/home.jpg'), 'default')
+        background = Gtk.Image()
+        try:
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
+                'resources/img/background.png', 400, -1, True)
+        except:
+            pass
+        else:
+            background.set_from_pixbuf(pixbuf)
+        self.main.add_named(background, 'default')
         self.main.add_named(self.create_event(), 'opened')
         self.main.add_named(self.create_loaded(), 'loaded')
         self.main.add_named(self.create_register(), 'register')
@@ -323,17 +342,24 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         self._create_popup_dialog('game',
                 'Aménagement de l’aire de jeu', self.create_game_manager)
 
+        # Show default screen and provide a custom (sub)title
+        self.activate_default()
+
     ###                                 ###
     #                                     #
     # Building and activating UI elements #
     #                                     #
     ###                                 ###
     def _create_popup_dialog(self, attr, title, generate_content):
+        """Reuse panels from the main window to create dialogs from."""
         dialog = Gtk.Dialog(title, self, Gtk.DialogFlags.MODAL)
         dialog.get_content_area().add(generate_content(dialog.response))
         setattr(self, attr+'_dialog', dialog)
 
     def activate_default(self, *widget):
+        """Show the home screen with nothing but a background image and
+        set the title of the window.
+        """
         self.set_custom_title('Bienvenue')
         self.main.set_visible_child_name('default')
 
@@ -393,6 +419,7 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         return panel
 
     def activate_event(self, *wigdet):
+        """Show the panel to select an event and set an appropriate title."""
         self.set_custom_title('Sélection d’un évènement')
         self.main.set_visible_child_name('opened')
 
@@ -410,6 +437,7 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         return panel
 
     def activate_loaded(self, *widgets):
+        """Show the main screen with action buttons."""
         self.set_custom_title('Menu principal')
         self.main.set_visible_child_name('loaded')
 
@@ -490,6 +518,7 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         return panel
 
     def activate_register(self, *widget):
+        """Show the panel used to register driver and drones."""
         self.set_custom_title('Gestion des pilotes et des drones')
         self.main.set_visible_child_name('register')
 
@@ -650,6 +679,7 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         return panel
 
     def activate_game_manager(self, *widget):
+        """Show the panel used to build new routes and custom set of rules."""
         self.set_custom_title('Mise en place de parcours')
         self.main.set_visible_child_name('game')
 
@@ -734,6 +764,9 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         return panel
 
     def activate_race_manager(self, *widget):
+        """If no race is started, show the panel used to setup a new race.
+        Show the race status otherwise.
+        """
         if self.race_id is not None:
             self.activate_launch_race()
         else:
@@ -825,6 +858,10 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         return panel
 
     def activate_launch_race(self, race_id=None):
+        """Show the panel used to monitor a race status.
+        Build it properly if it is the first time it is displayed for
+        a particular race.
+        """
         self.set_custom_title('Monitoring d’une course')
         self.main.set_visible_child_name('launch')
         if race_id is not None:
@@ -837,7 +874,7 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
                     i, driver, drone, 1, 0, 0, '00:00.0',
                     '00:00.0', '-', '-', '\uf018', ''])
             self.button_box.show_all()
-            # Cache le bouton arrêter et le bouton clore
+            # Hide both 'stop' and 'close' buttons
             self.button_box.get_children()[2].hide()
             self.button_box.get_children()[3].hide()
 
@@ -847,6 +884,7 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
     #                                                       #
     ###                                                   ###
     def create_manage_categories(self):
+        """Create a dialog to override the category associated to a drone."""
         panel = Gtk.VBox(spacing=6)
         row = Gtk.HBox()
         row.pack_start(Gtk.Label('Drone'), False, False, 4)
@@ -877,6 +915,9 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         return panel
 
     def create_stats_drivers(self):
+        """Create a dialog to list statistics about all the races a
+        driver attended to.
+        """
         panel = Gtk.VBox(spacing=6)
         row = Gtk.HBox()
         row.pack_start(Gtk.Label('Pilote'), False, False, 4)
@@ -968,6 +1009,9 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         return panel
 
     def create_stats_games(self):
+        """Create a dialog to list statistics about all the drivers that
+        attended to a specific game type.
+        """
         panel = Gtk.VBox(spacing=6)
         row = Gtk.HBox()
         row.pack_start(Gtk.Label('Type de jeu'), False, False, 4)
@@ -1058,18 +1102,25 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
     #                     #
     ###                 ###
     def new_database(self, *extra_args):
+        """Create a new database and use it for this session."""
         self._load_database(
             'Créer une nouvelle base de donnée',
             Gtk.FileChooserAction.SAVE,
             'Enregistrer', 'document-save', sql_create)
 
     def open_database(self, *extra_args):
+        """Open an existing database and use it for this session."""
         self._load_database(
             'Sélectionnez la base de donnée à ouvrir',
             Gtk.FileChooserAction.OPEN,
             'Ouvrir', 'document-open', sql_open)
 
     def _load_database(self, title, action, dialog_ok, icon, sql_generate):
+        """Factorization of code to open or create a database.
+        Create a file chooser and use the specified file as the database
+        for this session.
+        """
+        # Create the dialog depending on the open/create desired behavior
         dialog = Gtk.FileChooserDialog(title, self, action)
         button = dialog.add_button('Annuler', Gtk.ResponseType.CANCEL)
         button.set_image(Gtk.Image(icon_name='window-close'))
@@ -1077,11 +1128,13 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         button = dialog.add_button(dialog_ok, Gtk.ResponseType.OK)
         button.set_image(Gtk.Image(icon_name=icon))
         button.set_always_show_image(True)
+        # Wait for a filename to be selected or cancel the action
         response = dialog.run()
         filename = dialog.get_filename()
         dialog.destroy()
         if response != Gtk.ResponseType.OK:
             return
+        # Close any previously opened database and try to open the new one
         self.close_database()
         try:
             self.db = sql_generate(filename)
@@ -1096,19 +1149,23 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
             self.event_dropdown.remove_all()
             for event in self.db.get_events():
                 self.event_dropdown.append_text(event)
+            # Redirect to the event selection screen on success
             self.activate_event()
 
     def close_database(self, *widgets):
+        """Close any currently open database and revert the window to
+        its original state.
+        """
         try:
             self.console.stop_race()
         except ConsoleError:
             pass
+        self._clear_dropdown_values()
         if self.db:
             self.db.close()
             self.db = None
         self.beacon_names = None
         self.activate_default()
-        self._clear_dropdown_values()
 
     ###                                       ###
     #                                           #
