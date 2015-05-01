@@ -343,7 +343,8 @@ class Database:
 
     def get_game_names(self):
         """Fetch the names of all set of custom rules registered for
-        the event bound to this object."""
+        the event bound to this object.
+        """
         if self.id < 0:
             # Can't query the routes names if no event is bound to this object
             raise SQLError(
@@ -351,6 +352,15 @@ class Database:
                 'Impossible de voir les jeux associés.')
         query = 'SELECT intitule FROM jeux WHERE event_id=?'
         return (row[0] for row in self._execute(query, self.id))
+
+    def get_games_for_event(self, event):
+        """Fetch the names of all set of custom rules registered for
+        the specified event.
+        """
+        query = 'SELECT id FROM events WHERE nom=?'
+        event_id, = self._execute(query, event).fetchone()
+        query = 'SELECT intitule FROM jeux WHERE event_id=?'
+        return (row[0] for row in self._execute(query, event_id))
 
     def get_game_name(self, game_id):
         """Fetch the name of the given set of custom rules."""
@@ -423,6 +433,19 @@ class Database:
                 'pilotes ON coureurs.pilote_id=pilotes.id INNER JOIN '\
                 'courses ON coureurs.course_id=courses.id WHERE jeu_id=?'
         return self._execute(query, game).fetchall()
+
+    def get_races(self, game_name):
+        query = 'SELECT id FROM jeux WHERE intitule=?'
+        game, = self._execute(query, game_name).fetchone()
+        query = 'SELECT id FROM courses WHERE jeu_id=?'
+        return (row[0] for row in self._execute(query, game))
+
+    def get_results_for_race(self, race_id):
+        query = 'SELECT nom, designation, category, position, points, temps, '\
+                'tours, best, termine FROM coureurs INNER JOIN drones '\
+                'ON coureurs.drone_id=drones.id INNER JOIN pilotes ON '\
+                'coureurs.pilote_id=pilotes.id WHERE course_id=?'
+        return self._execute(query, int(race_id)).fetchall()
 
     def update_race(self, race_id, *drivers_status):
         """Updates the informations on a given race to create a leader-board

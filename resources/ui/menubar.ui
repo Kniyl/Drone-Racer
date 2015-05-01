@@ -61,6 +61,10 @@
                     <attribute name="label">Jeu</attribute>
                     <attribute name="action">app.stats_game</attribute>
                 </item>
+                <item>
+                    <attribute name="label">Course</attribute>
+                    <attribute name="action">app.stats_race</attribute>
+                </item>
             </section>
         </submenu>
     </menu>

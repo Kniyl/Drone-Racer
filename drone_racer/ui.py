@@ -148,6 +148,8 @@ class DroneRacer(Gtk.Application):
                 'Statistiques de pilotes', self.window.create_stats_drivers)
         self._connect_action('stats_game', self._create_dialog,
                 'Statistiques de jeux', self.window.create_stats_games)
+        self._connect_action('stats_race', self._create_dialog,
+                'Statistiques de courses', self.window.create_stats_races)
 
     def _on_activate(self, app):
         """React to the 'activate' signal. Show the main window to the user."""
@@ -1094,6 +1096,96 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
             row.pack_start(label, True, False, 4)
             row.show_all()
         dropdown.connect('changed', update)
+        return panel
+
+    def create_stats_races(self):
+        """Create a dialog to list statistics about all the drivers that
+        attended to a specific game type.
+        """
+        panel = Gtk.VBox(spacing=6)
+        row = Gtk.HBox()
+        row.pack_start(Gtk.Label('Évènement'), False, False, 4)
+        combo_event = Gtk.ComboBoxText()
+        for event in self.db.get_events():
+            combo_event.append_text(event)
+        row.pack_start(combo_event, True, True, 4)
+        row.pack_start(Gtk.Label('Jeu'), False, False, 4)
+        combo_game = Gtk.ComboBoxText()
+        combo_game.append_text('----------')
+        combo_game.remove_all()
+        row.pack_start(combo_game, True, True, 4)
+        row.pack_start(Gtk.Label('Course'), False, False, 4)
+        combo_race = Gtk.ComboBoxText()
+        combo_race.append_text('----------')
+        combo_race.remove_all()
+        row.pack_start(combo_race, True, True, 4)
+        panel.pack_start(row, True, False, 4)
+        def update_games(widget):
+            combo_race.remove_all()
+            combo_game.remove_all()
+            for game in self.db.get_games_for_event(widget.get_active_text()):
+                combo_game.append_text(game)
+        combo_event.connect('changed', update_games)
+        def update_races(widget):
+            combo_race.remove_all()
+            if widget.get_active() > -1:
+                for race in self.db.get_races(widget.get_active_text()):
+                    combo_race.append_text(str(race))
+        combo_game.connect('changed', update_races)
+        liststore = Gtk.ListStore(str, str, str, str, str, str, str, str, str)
+        treeview = Gtk.TreeView(liststore)
+        titles = (
+            'Pilote',
+            'Drone',
+            'Category',
+            'Place',
+            'Points',
+            'Temps',
+            'Tours',
+            'Meilleur tour',
+        )
+        for i, title in enumerate(titles):
+            renderer = Gtk.CellRendererText(xalign=0.5)
+            column = Gtk.TreeViewColumn(title, renderer, text=i)
+            column.set_alignment(0.5)
+            column.set_sort_column_id(i)
+            column.set_expand(i in (1,2))
+            treeview.append_column(column)
+        index = len(titles)
+        renderer = Gtk.CellRendererText(xalign=0.5)
+        renderer.props.font_desc = Pango.FontDescription('FontAwesome')
+        column = Gtk.TreeViewColumn('Status', renderer, text=index)
+        column.set_alignment(0.5)
+        column.set_sort_column_id(index)
+        treeview.append_column(column)
+        scroll = Gtk.ScrolledWindow(vexpand=True, hexpand=True)
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll.set_min_content_height(200)
+        scroll.add(treeview)
+        panel.pack_start(scroll, True, False, 4)
+        def update(widget):
+            liststore.clear()
+            if widget.get_active() < 0:
+                return
+            for name, drone, cat, pos, pts, time, laps, best, status in\
+                    self.db.get_results_for_race(widget.get_active_text()):
+                if pts is None:
+                    # Race has been cancelled
+                    liststore.append([
+                        name, drone, cat, '-',
+                        '-', '-', '-', '-', '-'])
+                else:
+                    time = '{:02.0f}:{:04.1f}'.format(*divmod(time, 60))
+                    if best:
+                        best = '{:02.0f}:{:04.1f}'.format(*divmod(best, 60))
+                    else:
+                        best = '-'
+                    status = status and '\uf11e' or '\uf0f9'
+                    liststore.append([
+                        name, drone, cat, str(pos), str(pts),
+                        time, str(laps), best, status])
+            scroll.show_all()
+        combo_race.connect('changed', update)
         return panel
 
     ###                 ###
