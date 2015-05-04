@@ -10,6 +10,7 @@ var WebSocketManager = function(sElem, hElem, mElem, tElem) {
 
   this.initDOM = function() {
     tableElem.find('tr:gt(0)').remove();
+    tableElem.find('th:eq(8)').html('Temps du dernier tour')
     titleElem.html('Aucune course en ce moment');
     messageElem.html('La prochaine course est en train d’être préparée. Patientez sagement.');
     tableElem.hide(100);
@@ -43,6 +44,7 @@ var WebSocketManager = function(sElem, hElem, mElem, tElem) {
       service.state = 'finished';
       clearInterval(service.interval);
       messageElem.html('La course est terminée. Attendez que le juge de course publie le classement définitif.');
+      tableElem.find('th:eq(8)').html('Meilleur tour')
     }
   };
 

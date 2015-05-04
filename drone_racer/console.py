@@ -29,6 +29,7 @@ class Console:
         self.rules = None
         self.timer = timer
         self.update = update
+        self.bests = None
 
     def setup_race(self, nb_drones, rules):
         """Initialize a new race.
@@ -53,6 +54,7 @@ class Console:
             'porte': None,
             'tours': 0,
         } for id in range(nb_drones)]
+        self.bests = [[] for _ in range(nb_drones)]
         # Faster lookup to decide whether or not to compute
         # the signal from a given gate
         self.gates = rules.gates.keys()
@@ -116,14 +118,16 @@ class Console:
         rest.finish()
         # Update status for drones that don't already cleared the race
         time = self.timer()
-        for drone, extra in zip(self.scores, self.extra_data):
+        for drone, extra, best in zip(self.scores,
+                self.extra_data, self.bests):
             if self.rules.timeout:
                 extra['timer'].cancel()
             if drone['finish'] is None:
                 offset = extra['offset'] or 0
                 drone['finish'] = not self.rules.timed_out(time - offset)
-                rest.update(drone)
-                self.update(drone)
+            drone['tour'] = min(best or (time,))
+            rest.update(drone)
+            self.update(drone)
         self.rules = None
         self.extra_data = None
 
@@ -170,6 +174,7 @@ class Console:
             return
         time = self.timer()
         data = self.extra_data[drone]
+        best = self.bests[drone]
         drone = self.scores[drone]
         # Drones are not allowed to continue when they finished a race
         if drone['finish'] is not None:
@@ -198,6 +203,7 @@ class Console:
         if turn:
             drone['tours'] += 1
             drone['tour'] = (time - data['time_laps']) / 10
+            best.append(drone['tour'])
             data['time_laps'] = time
             # If the race timed out or the drone performed enough laps
             # race is cleared
@@ -249,6 +255,29 @@ class Console:
         drone['points'] += amount
         rest.update(drone)
         self.update(drone)
+
+    def amend_time(self, drone, amount, lap):
+        """Manually modify the time of a lap for a specific drone.
+
+        Parameters:
+          - drone: identification number of the beacon attached to
+            the drone to modify
+          - amount: the quantity of seconds to add to this drone
+          - lap: the lap to add seconds to
+        """
+        # Account for line 46
+        best = self.bests[drone-1]
+        drone = self.scores[drone-1]
+        try:
+            best[lap-1] += amount
+        except IndexError:
+            raise ConsoleError('Ce drone n’a fait que {} tours. '
+                    'Impossible de modifier le {}{}.'.format(
+                        len(best), lap, lap == 1 and 'er' or 'eme'))
+        if drone['finish'] is not None:
+            drone['tour'] = min(best)
+            rest.update(drone)
+            self.update(drone)
 
     def kill_drone(self, drone):
         """Declare that a drone is no good anymore and won't be able to
