@@ -1,0 +1,57 @@
+<!DOCTYPE>
+<html lang=fr>
+  <head>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+    <title>Test websocket</title>
+    {% comment <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/themes/smoothness/jquery-ui.css"> %}
+    <link rel="stylesheet" href="{{ static_url("theme.css") }}">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+    {% comment <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/jquery-ui.min.js"></script> %}
+    <script src="{{ static_url("WebSocketManager.js") }}"></script>
+    <script src="{{ static_url("Application.js") }}"></script>
+    <script>
+    var app;
+    $(function() {app = new Application('{{ hostname }}', '{{ port }}', 'status', 'title-text', 'message', 'leaderboard');});
+    </script>
+  </head>
+  <body>
+    <header>
+    </header>
+    <div class="status-message">
+      <p id="status">Déconnecté du flux live. Essayez de rafraichir la page.</p>
+      <p onclick="$('#status').parent().hide(800);">×</p>
+    </div>
+    <section>
+      <h1 id="title-text"></h1>
+      <p id="message"></p>
+      <table id="leaderboard">
+        <tr>
+          <th>Balise</th>
+          <th>Pilote</th>
+          <th>Drone</th>
+          <th>Position</th>
+          <th>Points</th>
+          <th>Temps</th>
+          <th>Nombre de tours</th>
+          <th>Retard</th>
+          <th>Temps du dernier tour</th>
+          <th>Porte</th>
+          <th>État</th>
+        </tr>
+        <tr>
+          <td>1</td>
+          <td>Machin</td>
+          <td>Truc</td>
+          <td>0</td>
+          <td>0</td>
+          <td>00:00.0</td>
+          <td>0</td>
+          <td>-</td>
+          <td>-</td>
+          <td>-</td>
+          <td>Au sol</td>
+        </tr>
+      </table>
+    </section>
+  </body>
+</html>

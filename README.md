@@ -40,6 +40,11 @@ Readers (optional)
  * [pySerial](http://pyserial.sourceforge.net/)
  * [python-xbee](https://pypi.python.org/pypi/XBee)
 
+WebServer (optional)
+--------------------
+
+ * [tornado](http://www.tornadoweb.org/en/stable/)
+
 
 A Note on Data
 ==============
@@ -66,3 +71,17 @@ a drone passes by a gate. The first parameter is the gate identification letter
 
 Other than that, readers can be implemented freely and expect any kind of input
 data.
+
+
+Additional web server
+=====================
+
+Drone Racer is built with the ability to send satuses about races to a REST
+API (e.g. for the contestants and the audience to bo able to follow the races).
+
+For cases where it is not possible to provide a REST + WebSocket API on a
+dedicated server, Drone Racer is shipped with a setup of a tornado web server.
+This web server can easily be used on a LAN and provide as much visual feedback
+as provided on the Gtk UI.
+
+Edit the local_server.settings.Settings attributes to adapt it to your needs.

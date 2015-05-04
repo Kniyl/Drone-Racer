@@ -1,0 +1,54 @@
+html {
+  padding: 0px;
+  margin: 0px;
+}
+
+body {
+  padding: 0px;
+  margin: 0px;
+}
+
+.status-message {
+  background: #FFFFCC;
+  font: 0.8em sans-serif;
+  color: #000080;
+  text-align: center;
+  position: relative;
+}
+
+.status-message p {
+  padding: 3px 0px;
+  margin: 0px;
+  display: block;
+  word-spacing: nowrap;
+}
+
+.status-message p:last-child {
+  position: absolute;
+  top: 0;
+  right: 0;
+  margin: 0px 5px;
+  cursor: pointer;
+}
+
+section {
+  padding: 0px 3%;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: center;
+}
+
+tr {
+  border: 1px solid black;
+}
+
+th {
+  padding: 3px 1px;
+}
+
+h1 {
+  text-align: center;
+}
