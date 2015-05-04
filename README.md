@@ -84,4 +84,4 @@ dedicated server, Drone Racer is shipped with a setup of a tornado web server.
 This web server can easily be used on a LAN and provide as much visual feedback
 as provided on the Gtk UI.
 
-Edit the local_server.settings.Settings attributes to adapt it to your needs.
+Edit the ```local_server.settings.Settings``` attributes to adapt it to your needs.
