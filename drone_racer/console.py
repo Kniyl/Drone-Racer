@@ -97,7 +97,7 @@ class Console:
                     'Impossible de démarrer : '
                     'aucune course configurée')
         start = self.rules.common_start
-        t_out = self.rules.timeout
+        t_out = self.rules.timeout / 10
         self.extra_data = [{
             'offset': 0 if start else None,
             'time_laps': 0,
@@ -128,8 +128,8 @@ class Console:
         self.extra_data = None
 
     def _check_laps(self, drone):
-        """Monitoring function that get call for each drone at the end of its
-        timer.
+        """Monitoring function that gets called for each drone at the end
+        of its timer.
 
         Check if a drone has a remaining lap to clear and update its status
         accordingly.
@@ -145,6 +145,9 @@ class Console:
         # Enforce a status if strict timming
         if self.rules.strict:
             drone['finish'] = self.rules.nb_laps is None
+            # Check if all drones cleared the race
+            if not [True for d in self.scores if d['finish'] is None]:
+                self.stop_race()
         else:
             drone_lap = drone['tours']
             min_lap = min(d['tours'] for d in self.scores)

@@ -1,5 +1,6 @@
 from gi.repository import Gtk, GLib, Gio, Gdk, Pango, GdkPixbuf
 from threading import Timer
+from datetime import datetime, timedelta
 
 from .threads import StdInReader
 from .console import Console, ConsoleError, Rules, FreeForAll, Gates
@@ -309,7 +310,8 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
                 int, str, str, int, int, int, str, str, str, str, str, str)
         self.button_box = Gtk.HBox()
         self.countdown = None
-        self.timer = 0
+        self.timer_start = datetime.now()
+        self.timer_elapsed = timedelta(0, 0, 0)
         self.race_id = None
 
         # Populate content
@@ -1512,7 +1514,8 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
             return True
         cancel_btn, stop_btn = self.button_box.get_children()[1:4:2]
         try:
-            self.timer = 0
+            self.timer_elapsed = timedelta(0, 0, 0)
+            self.timer_start = datetime.now()
             self.console.start_race()
         except ConsoleError as e:
             dialog = WaitDialog(self, 'Une erreur est survenue', e.args[0])
@@ -1520,26 +1523,31 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
             dialog.destroy()
         else:
             stop_btn.set_sensitive(True)
-            GLib.timeout_add(100, self.show_timer)
+            GLib.idle_add(self._show_timer)
         finally:
             cancel_btn.set_sensitive(True)
             self.countdown = None
         return False
 
-    def show_timer(self):
-        self.timer += 1
-        mins, secs = divmod(self.timer, 600)
-        self.label_warmup.set_text('{:02d}:{:04.1f}'.format(mins, secs/10))
-        if self.console.extra_data:
+    def _show_timer(self):
+        elapsed = datetime.now() - self.timer_start
+        interval = timedelta(0, 0, 100000)
+        if elapsed < self.timer_elapsed + interval:
             return True
-        cancel_btn, close_btn, stop_btn = self.button_box.get_children()[1:4]
-        cancel_btn.hide()
-        stop_btn.hide()
-        close_btn.show_all()
-        return False
+        self.timer_elapsed += interval
+        mins, secs = divmod(self.timer_elapsed.seconds, 60)
+        self.label_warmup.set_text('{:02d}:{:02d}.{}'.format(mins, secs,
+            self.timer_elapsed.microseconds//100000))
+        if not self.console.extra_data:
+            cnl_btn, close_btn, stop_btn = self.button_box.get_children()[1:4]
+            cnl_btn.hide()
+            stop_btn.hide()
+            close_btn.show_all()
+        return bool(self.console.extra_data)
 
     def get_time(self):
-        return self.timer
+        time = datetime.now() - self.timer_start
+        return time.seconds * 10 + time.microseconds // 100000
 
     def update_race(self, status):
         GLib.idle_add(
