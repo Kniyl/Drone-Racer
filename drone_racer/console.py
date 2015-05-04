@@ -44,7 +44,7 @@ class Console:
                     'Attendez sa fin ou forcez son arrêt.')
         self.scores = [{
             'id': id+1,
-            'position': 1,
+            'position': nb_drones,
             'points': 0,
             'temps': 0.0,
             'retard': 0.0,
@@ -122,6 +122,7 @@ class Console:
             if drone['finish'] is None:
                 offset = extra['offset'] or 0
                 drone['finish'] = not self.rules.timed_out(time - offset)
+                rest.update(drone)
                 self.update(drone)
         self.rules = None
         self.extra_data = None
@@ -156,6 +157,8 @@ class Console:
         """React to events on the race as sent by the reader thread and
         update drone statuses accordingly.
         """
+        # DEBUG
+        print('Drone détecté : porte', gate, 'drone', drone + 1)
         # Does not process anything when no race is started
         if self.extra_data is None:
             return
@@ -165,6 +168,9 @@ class Console:
         time = self.timer()
         data = self.extra_data[drone]
         drone = self.scores[drone]
+        # Drones are not allowed to continue when they finished a race
+        if drone['finish'] is not None:
+            return
         time -= data['offset'] or 0
         # Compute state of the drone
         score, pos, delay, turn, on_going, start = self.rules.compute_score(
@@ -202,9 +208,10 @@ class Console:
                 drone['position'] = pos
                 drone['retard'] = delay if pos > 1 else 0.0
                 delay = 0.0 if pos > 1 else delay
+                nb_drones = len(self.scores)
                 for d in self.scores:
                     if d['position'] >= pos and d is not drone:
-                        d['position'] += 1
+                        d['position'] = min(nb_drones, d['position'] + 1)
                         d['retard'] += delay
                         rest.update(d)
                         self.update(d)

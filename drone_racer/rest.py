@@ -1,4 +1,6 @@
 from requests import request, RequestException
+from requests.auth import HTTPBasicAuth
+from local_server import *
 from threading import Thread
 from sys import stderr
 import traceback
@@ -20,6 +22,7 @@ def _execute_request(verb, path, **kwargs):
         path: URL of the target page.
         kwargs: extra arguments for the request such as POST data or timeout.
     """
+    kwargs.update({'auth': HTTPBasicAuth(basic_user, basic_password)})
     try:
         request(verb, _REST_ADDR + path, **kwargs)
     except RequestException as e:
@@ -38,7 +41,7 @@ def _do_request(path, args=None):
         thread = Thread(target=_execute_request,
                 name='rest-post',
                 args=('POST', path),
-                kwargs={'timeout':15, 'data':json.dumps(args)})
+                kwargs={'timeout':15, 'data':{'data':json.dumps(args)}})
     else:
         thread = Thread(target=_execute_request,
                 name='rest-get',
@@ -87,7 +90,7 @@ def setup(game_name, rules, *people):
     data = {'pilotes': people, 'course': setup}
     _do_request('setup/', data)
 
-def warmup(text):
+def warmup(text, start):
     """Tell the REST API that a race is being started and provide a
     text to display.
     """
@@ -99,7 +102,7 @@ def warmup(text):
      - start: bool
             -> whether the race should be started (timer, leader-board, etc.)
     """
-    _do_request('warmup/', text)
+    _do_request('warmup/', {'texte': text, 'start': start})
 
 def update(drone):
     """Tell the REST API that a drone had its status changed."""
@@ -171,4 +174,5 @@ def leaderboard(*drones):
      - porte: string or null
             -> identification of the last gate the drone passed by, if relevant
     """
-    _do_request('leaderboard/', drones)
+    _do_request('leaderboard/', {'drones': drones})
+

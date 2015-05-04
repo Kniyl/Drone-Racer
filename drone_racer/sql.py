@@ -412,7 +412,7 @@ class Database:
             driver, = self._execute(query, driver).fetchone()
             query = 'SELECT designation FROM drones WHERE id=?'
             drone, = self._execute(query, drone).fetchone()
-            result.append((id, driver, drone))
+            result.append({'id':id, 'nom':driver, 'drone':drone})
         return result
 
     def get_races_for_driver(self, driver_name):

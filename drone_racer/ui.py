@@ -871,10 +871,10 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
             self.label_warmup.set_text('Chaque pilote doit recevoir '
                     'la balise correspondant à son numéro')
             self.update_box.clear()
-            for i, driver, drone in self.db.get_race_drivers(race_id):
+            for driver in self.db.get_race_drivers(race_id):
                 self.update_box.append([
-                    i, driver, drone, 1, 0, 0, '00:00.0',
-                    '00:00.0', '-', '-', '\uf018', ''])
+                    driver['id'], driver['nom'], driver['drone'], 1, 0,
+                    0, '00:00.0', '00:00.0', '-', '-', '\uf018', ''])
             self.button_box.show_all()
             # Hide both 'stop' and 'close' buttons
             self.button_box.get_children()[2].hide()
@@ -1506,7 +1506,7 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         self.countdown -= 1
         c = self.countdown
         text = str(c) if c else 'GO!'
-        rest.warmup({'text': text, 'start': c == -1})
+        rest.warmup(text, c == -1)
         if c >= 0:
             self.label_warmup.set_text(text)
             return True
@@ -1569,6 +1569,10 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
     #                                  #
     ###                              ###
     def shutdown(self, *args):
+        try:
+            self.console.stop_race()
+        except ConsoleError:
+            pass
         if self.db:
             self.db.close()
         rest.cancel()
