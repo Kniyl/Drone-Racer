@@ -168,8 +168,6 @@ class Console:
         """React to events on the race as sent by the reader thread and
         update drone statuses accordingly.
         """
-        # DEBUG
-        print('Drone détecté : porte', gate, 'drone', drone + 1)
         # Does not process anything when no race is started
         if self.extra_data is None:
             return
