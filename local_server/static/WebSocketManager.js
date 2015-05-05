@@ -44,7 +44,6 @@ var WebSocketManager = function(sElem, hElem, mElem, tElem) {
       service.state = 'finished';
       clearInterval(service.interval);
       messageElem.html('La course est terminée. Attendez que le juge de course publie le classement définitif.');
-      tableElem.find('th:eq(8)').html('Meilleur tour')
     }
   };
 
@@ -116,6 +115,7 @@ var WebSocketManager = function(sElem, hElem, mElem, tElem) {
   this.leaderboardHandler = function(data) {
     if (service.state === 'finished') {
       service.state === 'canceled';
+      tableElem.find('th:eq(8)').html('Meilleur tour')
       $.each(data.drones, function(idx, drone) {
         var row = $('#Pilote'+drone.id).find('td');
         row.eq(3).html(drone.position);

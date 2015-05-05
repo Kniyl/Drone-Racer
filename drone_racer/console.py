@@ -118,18 +118,22 @@ class Console:
         rest.finish()
         # Update status for drones that don't already cleared the race
         time = self.timer()
-        for drone, extra, best in zip(self.scores,
-                self.extra_data, self.bests):
+        for drone, extra in zip(self.scores, self.extra_data):
             if self.rules.timeout:
                 extra['timer'].cancel()
             if drone['finish'] is None:
                 offset = extra['offset'] or 0
                 drone['finish'] = not self.rules.timed_out(time - offset)
-            drone['tour'] = min(best or (time,))
             rest.update(drone)
             self.update(drone)
         self.rules = None
         self.extra_data = None
+
+    def send_leaderboard(self):
+        for drone, best in zip(self.scores, self.bests):
+            b = min(best or (-1,))
+            drone['tour'] = b == -1 and None or b
+        return self.scores
 
     def _check_laps(self, drone):
         """Monitoring function that gets called for each drone at the end
@@ -250,7 +254,7 @@ class Console:
             the drone to modify
           - amount: the quantity of points to add to this drone
         """
-        # Account for line 46
+        # Account for line 47
         drone = self.scores[drone-1]
         drone['points'] += amount
         rest.update(drone)
@@ -265,19 +269,14 @@ class Console:
           - amount: the quantity of seconds to add to this drone
           - lap: the lap to add seconds to
         """
-        # Account for line 46
+        # Account for line 47
         best = self.bests[drone-1]
-        drone = self.scores[drone-1]
         try:
             best[lap-1] += amount
         except IndexError:
             raise ConsoleError('Ce drone n’a fait que {} tours. '
                     'Impossible de modifier le {}{}.'.format(
                         len(best), lap, lap == 1 and 'er' or 'eme'))
-        if drone['finish'] is not None:
-            drone['tour'] = min(best)
-            rest.update(drone)
-            self.update(drone)
 
     def kill_drone(self, drone):
         """Declare that a drone is no good anymore and won't be able to
@@ -286,7 +285,7 @@ class Console:
         Parameter:
           - drone: identification number of the beacon attached to the drone
         """
-        # Account for line 46
+        # Account for line 47
         drone = self.scores[drone-1]
         drone['finish'] = False
         rest.update(drone)

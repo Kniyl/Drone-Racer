@@ -486,10 +486,9 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
                 dialog.destroy()
                 return
             texts = [entry.get_text() for entry in entries]
-            if '' in texts:
+            if not texts[-1]:
                 dialog = WaitDialog(self, 'Erreur à %s' % action,
-                        'Un numéro de téléphone et une adresse '
-                        'e-mail sont nécessaires.')
+                        'Une adresse e-mail est nécessaire pour s’inscrire.')
                 dialog.run()
                 dialog.destroy()
                 return
@@ -825,8 +824,9 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
             self.activate_loaded()
         def close_race(widget):
             self.label_warmup.modify_font(self.label_font)
-            self.db.update_race(self.race_id, *self.console.scores)
-            rest.leaderboard(*self.console.scores)
+            leaderboard = self.console.send_leaderboard()
+            self.db.update_race(self.race_id, *leaderboard)
+            rest.leaderboard(*leaderboard)
             self.race_id = None
             self.activate_loaded()
         def stop_race(widget):
