@@ -7,6 +7,11 @@ from .console import Console, ConsoleError, Rules, FreeForAll, Gates
 from .sql import sql_create, sql_open, SQLError
 from . import rest
 
+try:
+    import simplejson as json
+except ImportError:
+    import json
+
 
 class UserDialog(Gtk.Dialog):
     """Custom dialog window that populates its content from a function call."""
@@ -151,6 +156,7 @@ class DroneRacer(Gtk.Application):
                 'Statistiques de jeux', self.window.create_stats_games)
         self._connect_action('stats_race', self._create_dialog,
                 'Statistiques de courses', self.window.create_stats_races)
+        self._connect_action('import', self._create_dialog_import)
 
     def _on_activate(self, app):
         """React to the 'activate' signal. Show the main window to the user."""
@@ -204,6 +210,31 @@ class DroneRacer(Gtk.Application):
             dialog = UserDialog(self.window, title, generate_content)
         dialog.run()
         dialog.destroy()
+
+    def _create_dialog_import(self, action, u_data):
+        # Equivalent to checking if self.window.db.id < 0 but
+        # without having to check if self.window.db is not None
+        if self.window.beacon_names is None:
+            dialog = WaitDialog(self.window,
+                    'Aucune base de donnée connectée',
+                    'Ouvrez ou créez une base de donnée '
+                    'avant d’utiliser cette action.')
+            dialog.run()
+            dialog.destroy()
+        else:
+            dialog = Gtk.FileChooserDialog('Fichier à importer',
+                    self.window, Gtk.FileChooserAction.OPEN)
+            button = dialog.add_button('Annuler', Gtk.ResponseType.CANCEL)
+            button.set_image(Gtk.Image(icon_name='window-close'))
+            button.set_always_show_image(True)
+            button = dialog.add_button('Ouvrir', Gtk.ResponseType.OK)
+            button.set_image(Gtk.Image(icon_name='document-open'))
+            button.set_always_show_image(True)
+            response = dialog.run()
+            filename = dialog.get_filename()
+            dialog.destroy()
+            if response == Gtk.ResponseType.OK:
+                self.window.import_drivers(filename)
 
     def _manage_rest_server(self, action, user_data):
         """Create a dialog window to specifically manage the URL to the
@@ -1260,6 +1291,26 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
             self.db = None
         self.beacon_names = None
         self.activate_default()
+
+    def import_drivers(self, filename):
+        try:
+            with open(filename, 'r') as f:
+                for line in f:
+                    data = json.loads(line)
+                    self.db.register_driver(data['nom'],
+                            data['portable'], data['email'])
+                    drones = {}
+                    for idx, value in data['drone'].items():
+                        try:
+                            drones[int(idx)] = (value['data'], '')
+                        except ValueError:
+                            pass
+                    self.db.register_drones_for_driver(
+                            data['nom'], *drones.values())
+        except Exception as e:
+            dialog = WaitDialog(self, 'Import error', e.args[0])
+            dialog.run()
+            dialog.destroy()
 
     ###                                       ###
     #                                           #

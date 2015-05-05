@@ -48,6 +48,10 @@
                     <attribute name="label">_REST server</attribute>
                     <attribute name="action">app.rest</attribute>
                 </item>
+                <item>
+                    <attribute name="label">_Importer des pilotes</attribute>
+                    <attribute name="action">app.import</attribute>
+                </item>
             </section>
         </submenu>
         <submenu>
