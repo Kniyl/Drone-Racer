@@ -119,9 +119,13 @@ else:
                 gate = gate.decode()
                 # Compensate for the drone numbering vs. its indexing
                 drone = int(drone) - 1
-            except (KeyError, UnicodeError, ValueError) as e:
+            except (UnicodeError, ValueError) as e:
                 print('Le message', response_dict['rf_data'],
                         'a été reçu mais n’est pas compris par l’application.',
+                        file=sys.stderr)
+                print(e, file=sys.stderr)
+            except KeyError as e:
+                print('Un message ne contenant pas de données a été reçu.',
                         file=sys.stderr)
                 print(e, file=sys.stderr)
             else:
