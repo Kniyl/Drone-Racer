@@ -275,6 +275,12 @@ class Console:
             raise ConsoleError('Ce drone n’a fait que {} tours. '
                     'Impossible de modifier le {}{}.'.format(
                         len(best), lap, lap == 1 and 'er' or 'eme'))
+        else:
+            if lap == len(best):
+                drone = self.scores[drone-1]
+                drone['tour'] = best[-1]
+                self.update(drone)
+                rest.update(drone)
 
     def kill_drone(self, drone):
         """Declare that a drone is no good anymore and won't be able to

@@ -85,6 +85,50 @@ class WaitDialog(UserDialog):
         return hbox
 
 
+class InfoDialog(UserDialog):
+    """Custom dialog window that simulates a Gtk.MessageDialog with better UI
+    and granularity.
+    """
+
+    def __init__(self, parent, title, *infos):
+        """Create and show the dialog window.
+
+        Parameters:
+          - parent: the parent window of this dialog
+          - title: a text used both as the title of the dialog and the main
+            displayed information
+          - infos: a sequence of text to display in the dialog, each text in
+            its own paragraph
+        """
+        self._main = title
+        self._secondary = infos
+        super().__init__(parent, title, None)
+        self.set_size_request(400, 1)
+
+    def _do_generate(self):
+        """Return the content to display in the dialog."""
+        hbox = Gtk.HBox()
+        vbox = Gtk.VBox(spacing=1)
+        # Put some space around the text for eye-candyness
+        vbox.set_margin_top(10)
+        vbox.set_margin_bottom(10)
+        vbox.set_margin_right(10)
+        vbox.set_margin_left(10)
+        label = Gtk.Label()
+        label.set_markup('<b><big>{}</big></b>'.format(self._main))
+        vbox.pack_start(label, True, True, 0)
+        for text in self._secondary:
+            label = Gtk.Label(label=text)
+            # Keep the dialog width as small as possible
+            label.set_line_wrap(True)
+            vbox.pack_start(label, True, True, 4)
+        image = Gtk.Image(icon_name='dialog-information',
+                          icon_size=Gtk.IconSize.DIALOG)
+        hbox.pack_start(image, False, False, 0)
+        hbox.pack_start(vbox, True, True, 0)
+        return hbox
+
+
 class DroneRacer(Gtk.Application):
     """Custom application life-cycle that creates itself the window of
     our choice with which it will associate. Manage the menu bar for
@@ -140,6 +184,15 @@ class DroneRacer(Gtk.Application):
         self._connect_action('win_close', self.window.close_database)
         self._connect_action('quit', self.close_application)
         self._connect_action('rest', self._manage_rest_server)
+        self._connect_action('version', self._create_info, 'Version',
+                'Version : 1.0.0',
+                'Date de création : 6 mai 2015',
+                'Auteur : Mathias Ettinger')
+        self._connect_action('about', self._create_info, 'À propos',
+                'Drone Racer c’est bien', 'Drone Racer c’est beau',
+                'Drone Racer fera venir des chattons tout mignon dans '
+                'votre appartement douillet', 'Drone Racer est l’ami '
+                'des licornes')
 
         # Connect database dependent menu items
         self._connect_action('win_register_dialog',
@@ -194,6 +247,14 @@ class DroneRacer(Gtk.Application):
             dialog.show_all()
             dialog.run()
             dialog.hide()
+
+    def _create_info(self, action, u_data, title, *text):
+        """Create a dialog window to display generic informations to
+        the user.
+        """
+        dialog = InfoDialog(self.window, title, *text)
+        dialog.run()
+        dialog.destroy()
 
     def _create_dialog(self, action, u_data, title, generate_content):
         """Create a dialog window and wait for it to return.
@@ -1543,12 +1604,24 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         if not text:
             return
         drone = self.update_box[path][0]
-        try:
-            points = int(text)
-        except ValueError:
-            self.console.kill_drone(drone)
+        if ' ' in text:
+            try:
+                lap, time = text.split(' ')
+                self.console.amend_time(drone, int(time), int(lap))
+            except (ValueError, ConsoleError) as e:
+                dialog = WaitDialog(self, 'Erreur à l’édition de pénalités',
+                        'Il semblerait que vous souhaitez éditer le temps '
+                        'de l’un des participants mais l’opération a échoué '
+                        'pour le motif suivant : ' + e.args[0])
+                dialog.run()
+                dialog.destroy()
         else:
-            self.console.edit_score(drone, points)
+            try:
+                points = int(text)
+            except ValueError:
+                self.console.kill_drone(drone)
+            else:
+                self.console.edit_score(drone, points)
 
     ###                        ###
     #                            #
