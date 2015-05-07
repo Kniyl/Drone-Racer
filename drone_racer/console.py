@@ -99,7 +99,7 @@ class Console:
                     'Impossible de démarrer : '
                     'aucune course configurée')
         start = self.rules.common_start
-        t_out = self.rules.timeout / 10
+        t_out = self.rules.timeout / 10 if self.rules.timeout else None
         self.extra_data = [{
             'offset': 0 if start else None,
             'time_laps': 0,
