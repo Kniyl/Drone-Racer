@@ -797,7 +797,11 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
                 dialog.destroy()
                 return
             entrants = []
+            drivers = set()
+            drones = set()
+            beacon = 0
             for row in self.race_box.get_children():
+                beacon += 1
                 _, driver, _, drone, _ = row.get_children()
                 driver = driver.get_active_text()
                 drone = drone.get_active_text()
@@ -810,7 +814,7 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
                     dialog.run()
                     dialog.destroy()
                     return
-                if (driver, drone) in entrants:
+                if driver in drivers:
                     dialog = WaitDialog(self,
                             'Erreur à la création d’une course',
                             '{} ne peut pas participer deux fois '
@@ -818,7 +822,9 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
                     dialog.run()
                     dialog.destroy()
                     return
-                entrants.append((driver, drone))
+                entrants.append((driver, drone, beacon))
+                drivers.add(driver)
+                drones.add(beacon)
             if entrants:
                 try:
                     game_name = self.race_dropdown.get_active_text()
@@ -834,7 +840,7 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
                     dialog.destroy()
                 else:
                     race_id = self.db.register_new_race(game_name, entrants)
-                    self.console.setup_race(len(entrants), rules)
+                    self.console.setup_race(drones, rules)
                     self.race_dropdown.set_active(-1)
                     self.activate_launch_race(race_id)
                     ordered_drivers = self.db.get_race_drivers(race_id)
@@ -1675,25 +1681,26 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
 
     def update_race(self, status):
         GLib.idle_add(
-                self._grid_update, status['id'] - 1,
+                self._grid_update, status['id'],
                 status['position'], status['points'],
                 status['tours'], status['temps'],
                 status['retard'], status['tour'],
                 status['porte'], status['finish'])
 
     def _grid_update(self, i, pos, pts, laps, time, delay, last, beacon, end):
-        treeiter = self.update_box.get_iter(Gtk.TreePath(i))
-        row = self.update_box[treeiter]
-        row[3] = pos
-        row[4] = pts
-        row[5] = laps
-        row[6] = '{:02.0f}:{:04.1f}'.format(*divmod(time, 60))
-        row[7] = '{:02.0f}:{:04.1f}'.format(*divmod(delay, 60))
-        if last:
-            row[8] = '{:02.0f}:{:04.1f}'.format(*divmod(last, 60))
-        if beacon:
-            row[9] = beacon
-        row[10] = '\uf1d9' if end is None else end and '\uf11e' or '\uf0f9'
+        for row in self.update_box:
+            if row[0] != i:
+                continue
+            row[3] = pos
+            row[4] = pts
+            row[5] = laps
+            row[6] = '{:02.0f}:{:04.1f}'.format(*divmod(time, 60))
+            row[7] = '{:02.0f}:{:04.1f}'.format(*divmod(delay, 60))
+            if last:
+                row[8] = '{:02.0f}:{:04.1f}'.format(*divmod(last, 60))
+            if beacon:
+                row[9] = beacon
+            row[10] = '\uf1d9' if end is None else end and '\uf11e' or '\uf0f9'
 
     ###                              ###
     #                                  #

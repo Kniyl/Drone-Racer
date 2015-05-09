@@ -268,8 +268,8 @@ class Database:
         Parameters:
           - game_name: name of the route and custom set of rules used
             for this race
-          - contestants: a list of (driver name, drone type) pairs that
-            will attend the race
+          - contestants: a list of (driver name, drone type, beacon)
+            3-items-sequence that will attend the race
         """
         if self.id < 0:
             # Can't register the race if no event is bound to this object
@@ -280,9 +280,7 @@ class Database:
         game_id, = self._execute(query, self.id, game_name).fetchone()
         query = 'INSERT INTO courses(jeu_id) VALUES (?)'
         race_id = self._execute(query, game_id).lastrowid
-        shuffle(contestants)
-        beacon = len(contestants)
-        for driver, drone in contestants:
+        for driver, drone, beacon in contestants:
             query = 'SELECT id FROM pilotes WHERE nom=?'
             driver_id, = self._execute(query, driver).fetchone()
             query = 'SELECT id FROM drones WHERE designation=?'
@@ -290,7 +288,6 @@ class Database:
             query = 'INSERT INTO coureurs(course_id, pilote_id, '\
                     'drone_id, balise_id) VALUES (?,?,?,?)'
             self._execute(query, race_id, driver_id, drone_id, beacon)
-            beacon -= 1
         return race_id
 
     def get_drivers(self):

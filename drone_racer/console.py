@@ -31,7 +31,7 @@ class Console:
         self.update = update
         self.bests = None
 
-    def setup_race(self, nb_drones, rules):
+    def setup_race(self, drones, rules):
         """Initialize a new race.
 
         Parameters:
@@ -44,8 +44,8 @@ class Console:
                     'Une course est déjà en cours. '
                     'Attendez sa fin ou forcez son arrêt.')
         self.scores = [{
-            'id': id+1,
-            'position': nb_drones,
+            'id': id,
+            'position': len(drones),
             'points': 0,
             'temps': 0.0,
             'retard': 0.0,
@@ -53,8 +53,8 @@ class Console:
             'finish': None,
             'porte': None,
             'tours': 0,
-        } for id in range(nb_drones)]
-        self.bests = [[] for _ in range(nb_drones)]
+        } if id in drones else None for id in range(1, max(drones)+1)]
+        self.bests = [[] for _ in range(max(drones))]
         # Faster lookup to decide whether or not to compute
         # the signal from a given gate
         self.gates = rules.gates.keys()
@@ -71,17 +71,19 @@ class Console:
                     'Impossible d’annuler.')
         # Every drone get the same meaningless informations
         for drone in self.scores:
-            drone['position'] = None
-            drone['points'] = None
-            drone['temps'] = None
-            drone['tours'] = None
-            drone['tour'] = None
-            drone['finish'] = False
-            drone['retard'] = None
+            if drone is not None:
+                drone['position'] = None
+                drone['points'] = None
+                drone['temps'] = None
+                drone['tours'] = None
+                drone['tour'] = None
+                drone['finish'] = False
+                drone['retard'] = None
         # Cancel each drone's timer if there was a time limit
         if self.extra_data and self.rules.timeout:
             for data in self.extra_data:
-                data['timer'].cancel()
+                if data is not None:
+                    data['timer'].cancel()
         self.rules = None
         self.extra_data = None
         rest.cancel()
@@ -103,12 +105,14 @@ class Console:
         self.extra_data = [{
             'offset': 0 if start else None,
             'time_laps': 0,
-            'timer': Timer(t_out, self._check_laps, (id,)) if t_out else None,
-        } for id in range(len(self.scores))]
+            'timer': Timer(t_out, self._check_laps,
+                (drone['id'],)) if t_out else None,
+        } if drone is not None else None for drone in self.scores]
         # Start every drone's timer right now if there is no starting mark
         if t_out and start:
             for data in self.extra_data:
-                data['timer'].start()
+                if data is not None:
+                    data['timer'].start()
 
     def stop_race(self):
         """Halt the current race and stop monitoring for events."""
@@ -119,6 +123,8 @@ class Console:
         # Update status for drones that don't already cleared the race
         time = self.timer()
         for drone, extra in zip(self.scores, self.extra_data):
+            if drone is None:
+                continue
             if self.rules.timeout:
                 extra['timer'].cancel()
             if drone['finish'] is None:
@@ -131,9 +137,10 @@ class Console:
 
     def send_leaderboard(self):
         for drone, best in zip(self.scores, self.bests):
-            b = min(best or (-1,))
-            drone['tour'] = b == -1 and None or b
-        return self.scores
+            if drone is not None:
+                b = min(best or (-1,))
+                drone['tour'] = b == -1 and None or b
+        return [drone for drone in self.scores if drone is not None]
 
     def _check_laps(self, drone):
         """Monitoring function that gets called for each drone at the end
@@ -142,10 +149,10 @@ class Console:
         Check if a drone has a remaining lap to clear and update its status
         accordingly.
         """
-        data = self.extra_data[drone]
-        drone = self.scores[drone]
+        data = self.extra_data[drone-1]
+        drone = self.scores[drone-1]
         # Nothing to do if the drone already cleared the race
-        if drone['finish'] is not None:
+        if drone is None or drone['finish'] is not None:
             return
         time = self.timer()
         time -= data['offset'] or 0
@@ -179,7 +186,7 @@ class Console:
         best = self.bests[drone]
         drone = self.scores[drone]
         # Drones are not allowed to continue when they finished a race
-        if drone['finish'] is not None:
+        if drone is None or drone['finish'] is not None:
             return
         time -= data['offset'] or 0
         # Compute state of the drone
@@ -254,9 +261,10 @@ class Console:
         """
         # Account for line 47
         drone = self.scores[drone-1]
-        drone['points'] += amount
-        rest.update(drone)
-        self.update(drone)
+        if drone is not None:
+            drone['points'] += amount
+            rest.update(drone)
+            self.update(drone)
 
     def amend_time(self, drone, amount, lap):
         """Manually modify the time of a lap for a specific drone.
@@ -291,9 +299,10 @@ class Console:
         """
         # Account for line 47
         drone = self.scores[drone-1]
-        drone['finish'] = False
-        rest.update(drone)
-        self.update(drone)
+        if drone is not None:
+            drone['finish'] = False
+            rest.update(drone)
+            self.update(drone)
 
 
 class Gates(Enum):
