@@ -185,14 +185,29 @@ class DroneRacer(Gtk.Application):
         self._connect_action('quit', self.close_application)
         self._connect_action('rest', self._manage_rest_server)
         self._connect_action('version', self._create_info, 'Version',
-                'Version : 1.0.0',
+                'Version : 1.1.0',
                 'Date de création : 6 mai 2015',
                 'Auteur : Mathias Ettinger')
         self._connect_action('about', self._create_info, 'À propos',
-                'Drone Racer c’est bien', 'Drone Racer c’est beau',
-                'Drone Racer fera venir des chattons tout mignon dans '
-                'votre appartement douillet', 'Drone Racer est l’ami '
-                'des licornes')
+                'Drone Racer est un projet développé dans le cadre '
+                'du DroneFest 2015 organisé pendant le FabLab Festival '
+                'de la même année.', 'Ce logiciel permet de créer '
+                'différent évènements pour organiser des compétitions '
+                'de drones, enregistrer des participants et leur '
+                'associer des drones, classer les drones en catégories, '
+                'créer plusieurs types de parcours par évènement, mettre '
+                'en place des courses pour les suivre en direct et '
+                'assembler des statistiques pour chaque pilote, évènement '
+                'ou parcours.', 'Ce logiciel est prévu pour être installé '
+                'sur un Raspberry Pi et utilise le module SQLite intégré '
+                'dans Python pour se passer d’un service supplémentaire '
+                'servant à gérer la base de donnée.', 'Les données relatives '
+                'au déroulement de la course sont prévues pour arriver sur '
+                'un port série au moyen d’un XBee, mais leur gestion est '
+                'aisément extensible.', 'Optionnellement, les données sont '
+                'transmises à une API REST qui, si elle est couplée avec un '
+                'serveur WebSocket, permet d’afficher l’état de la course '
+                'pour le public.')
 
         # Connect database dependent menu items
         self._connect_action('win_register_dialog',
