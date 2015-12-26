@@ -3,6 +3,7 @@
 import os
 import sys
 from threading import Thread
+import socket
 try:
     from serial import Serial
     from xbee import XBee, ZigBee
@@ -61,17 +62,80 @@ class StdInReader(BaseReader):
     """Read data from stdin. Primarily used for tests and debug."""
 
     def read_new_value(self):
-        """Read input data and return them as a tuple (gate identifier, drone
-        number). Subclasses must implement this method.
+        """Read input data and return them as a tuple (gate identifier,
+        drone number).
+
+        Convert data such as "0 1" to the tuple ('A', 1).
         """
         raw = input('[@] ').split()
         if len(raw) != 2:
             return '?', -1
         try:
-            value = (chr(int(raw[0])+65), int(raw[1]))
+            return (chr(int(raw[0])+ord('A')), int(raw[1]))
         except:
-            value = '?', -1
-        return value
+            return '?', -1
+
+
+class _UDPReader(BaseReader):
+    """Read data from UDP packets. Used when communicating via WiFi
+    with the gates.
+    """
+
+    def __init__(self, iface, port, update_function):
+        """Spawn a thread that continuously read data for drones statuses.
+        
+        Parameter:
+          - iface: the address of the interface to listen on.
+          - port: the socket port to listen on.
+          - update_function: the function that will be called each time a
+            valid data is read.
+        """
+        super().__init__(update_function)
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._socket.bind((iface, port))
+
+    def read_new_value(self):
+        """Read input data and return them as a tuple (gate identifier,
+        drone number).
+
+        Decode an UDP dataframe containing b"C:3" to the tuple ('C', 3).
+        """
+        msg = self._socket.recv(128) # Way too much for messages like <A:1>
+        try:
+            gate, drone = mgs.split(b':')
+            gate = gate.decode()
+            # Compensate for the drone numbering vs. its indexing
+            drone = int(drone) - 1
+        except (UnicodeError, ValueError) as e:
+            print('Le message', msg, 'a été reçu mais n’est pas compris par',
+                    'l’application.', file=sys.stderr)
+            print(e, file=sys.stderr)
+            return '?', 1
+        else:
+            return gate, drone
+
+
+class UDPReader:
+    """Factory of _UDPReaders."""
+
+    def __init__(self, iface, port):
+        """Save parameters for future use.
+
+        Parameter:
+          - iface: name or address of the interface to listen on.
+          - port: the socket port to listen on.
+        """
+        self._iface = socket.gethostbyname(iface)
+        self._port = port
+
+    def __call__(self, callback):
+        """Generate the appropriate class to read data.
+
+        Parameter:
+          - callback: the function that will be called each
+            time a valid data is read.
+        """
+        return _UDPReader(self.iface, self.port, callback)
 
 
 if XBee is None:
