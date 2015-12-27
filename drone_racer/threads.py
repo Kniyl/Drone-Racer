@@ -34,8 +34,12 @@ class BaseReader(Thread):
         for further computation.
         """
         while self._should_continue:
-            gate, drone = self.read_new_value()
-            self._process_value(gate, drone)
+            try:
+                gate, drone = self.read_new_value()
+            except TypeError:
+                pass
+            else:
+                self._process_value(gate, drone)
 
     def stop(self):
         """Signal that the thread has to stop reading its inputs."""
@@ -69,12 +73,11 @@ class StdInReader(BaseReader):
         Convert data such as "0 1" to the tuple ('A', 1).
         """
         raw = input('[@] ').split()
-        if len(raw) != 2:
-            return '?', -1
         try:
-            return (chr(int(raw[0])+ord('A')), int(raw[1]))
-        except:
-            return '?', -1
+            gate, drone = raw
+            return chr(int(gate) + ord('A')), int(drone)
+        except ValueError:
+            pass
 
 
 class _UDPReader(BaseReader):
@@ -105,13 +108,10 @@ class _UDPReader(BaseReader):
         """
         # Non-blocking read so this thread will shut down with the application
         ready, _, _ = select(self._watch, [], [], 0)
-        if not ready:
-            return '?', -1
         for socket in ready:
             if socket is self._socket:
                 client, _ = socket.accept()
                 self._watch.append(client)
-                return '?', -1
             else:
                 msg = socket.recv(128) # Way too much for messages like <A:1>
                 socket.shutdown()
@@ -126,7 +126,6 @@ class _UDPReader(BaseReader):
                     print('Le message', msg, 'a été reçu mais n’est pas'
                           'compris par l’application.', file=sys.stderr)
                     print(e, file=sys.stderr)
-                    return '?', -1
                 else:
                     return gate, drone
 
@@ -161,7 +160,6 @@ if XBee is None:
         def read_new_value(self):
             """Cancel this thread to avoid burning resources."""
             self._should_continue = False
-            return '?', -1
 
     def XBeeReader(*args, **kwargs):
         """Wrapper around the xbee module to integrate our _BeeReaderMixin
