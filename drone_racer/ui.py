@@ -436,7 +436,7 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         try:
             pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
                 'resources/img/background.png', 400, -1, True)
-        except:
+        except GLib.Error:
             pass
         else:
             background.set_from_pixbuf(pixbuf)
