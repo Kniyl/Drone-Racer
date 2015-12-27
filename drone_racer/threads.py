@@ -2,8 +2,9 @@
 
 import os
 import sys
-from threading import Thread
 import socket
+from threading import Thread
+from select import select
 try:
     from serial import Serial
     from xbee import XBee, ZigBee
@@ -51,7 +52,7 @@ class BaseReader(Thread):
 
         Parameters:
           - gate: the gate identification letter(s)
-          - drone: the drone identification number (1-based)
+          - drone: the drone identification number (0-based)
         """
         if drone < 0:
             return
@@ -77,7 +78,7 @@ class StdInReader(BaseReader):
 
 
 class _UDPReader(BaseReader):
-    """Read data from UDP packets. Used when communicating via WiFi
+    """Read data from UDP datagrams. Used when communicating via WiFi
     with the gates.
     """
 
@@ -93,39 +94,52 @@ class _UDPReader(BaseReader):
         super().__init__(update_function)
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._socket.bind((iface, port))
+        self._socket.listen(5)
+        self._watch = [self._socket]
 
     def read_new_value(self):
         """Read input data and return them as a tuple (gate identifier,
         drone number).
 
-        Decode an UDP dataframe containing b"C:3" to the tuple ('C', 3).
+        Decode an UDP datagram containing b"C:3" to the tuple ('C', 2).
         """
-        msg = self._socket.recv(128) # Way too much for messages like <A:1>
-        try:
-            gate, drone = mgs.split(b':')
-            gate = gate.decode()
-            # Compensate for the drone numbering vs. its indexing
-            drone = int(drone) - 1
-        except (UnicodeError, ValueError) as e:
-            print('Le message', msg, 'a été reçu mais n’est pas compris par',
-                    'l’application.', file=sys.stderr)
-            print(e, file=sys.stderr)
-            return '?', 1
-        else:
-            return gate, drone
+        # Non-blocking read so this thread will shut down with the application
+        ready, _, _ = select(self._watch, [], [], 0)
+        if not ready:
+            return '?', -1
+        for socket in ready:
+            if socket is self._socket:
+                client, _ = socket.accept()
+                self._watch.append(client)
+                return '?', -1
+            else:
+                msg = socket.recv(128) # Way too much for messages like <A:1>
+                socket.shutdown()
+                socket.close()
+                self._watch.remove(socket)
+                try:
+                    gate, drone = mgs.split(b':')
+                    gate = gate.decode()
+                    # Compensate for the drone numbering vs. its indexing
+                    drone = int(drone) - 1
+                except (UnicodeError, ValueError) as e:
+                    print('Le message', msg, 'a été reçu mais n’est pas'
+                          'compris par l’application.', file=sys.stderr)
+                    print(e, file=sys.stderr)
+                    return '?', -1
+                else:
+                    return gate, drone
 
 
 class UDPReader:
     """Factory of _UDPReaders."""
 
-    def __init__(self, iface, port):
+    def __init__(self, port):
         """Save parameters for future use.
 
         Parameter:
-          - iface: name or address of the interface to listen on.
           - port: the socket port to listen on.
         """
-        self._iface = socket.gethostbyname(iface)
         self._port = port
 
     def __call__(self, callback):
@@ -135,7 +149,7 @@ class UDPReader:
           - callback: the function that will be called each
             time a valid data is read.
         """
-        return _UDPReader(self.iface, self.port, callback)
+        return _UDPReader(socket.gethostname(), self.port, callback)
 
 
 if XBee is None:
@@ -154,8 +168,8 @@ if XBee is None:
         into the appropriate base class.
         Dummy implementation because xbee module could not be loaded.
         """
-        print('xbee module not found. This reader is up to no good',
-                file=sys.stderr)
+        print('Le module XBee est instrouvable. Aucune donnée ne pourra',
+              'être lue', file=sys.stderr)
         return _BeeReader
 else:
     class _BeeReaderMixin:
@@ -185,12 +199,12 @@ else:
                 drone = int(drone) - 1
             except (UnicodeError, ValueError) as e:
                 print('Le message', response_dict['rf_data'],
-                        'a été reçu mais n’est pas compris par l’application.',
-                        file=sys.stderr)
+                      'a été reçu mais n’est pas compris par l’application.',
+                      file=sys.stderr)
                 print(e, file=sys.stderr)
             except KeyError as e:
                 print('Un message ne contenant pas de données a été reçu.',
-                        file=sys.stderr)
+                      file=sys.stderr)
                 print(e, file=sys.stderr)
             else:
                 self._update_data(gate, drone)

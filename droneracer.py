@@ -4,6 +4,7 @@ from argparse import ArgumentParser
 import drone_racer
 
 
+# Be sure to be at the right place for relative path of images in Gtk
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 parser = ArgumentParser(description='Interface graphique "Drone Racer"')
@@ -23,20 +24,22 @@ parser.add_argument('--baudrate', dest='baudrate', metavar='BPS',
                     'utilisé pour la connexion avec le module XBee')
 
 # UDP args
-parser.add_argument('--interface', dest='iface', metavar='NAME',
-                    default=None, help='Spécifie l’interface sur laquelle '
-                    'écouter les messages UDP')
+parser.add_argument('--use-udp', dest='udp', action='store_true',
+                    help='Spécifie si la communication doit se faire '
+                    'par datagrames UDP.')
 parser.add_argument('--port', dest='port', metavar='NUM', type=int,
                     default=4387, help='Port à utiliser pour l’écoute UDP')
 
+# Choose the appropriate reader
 args = parser.parse_args()
 if args.serial is not None:
     reader = drone_racer.XBeeReader(
             args.serial, args.baudrate, zigbee=args.zigbee)
-elif args.iface is not None:
-    reader = drone_racer.UDPReader(args.iface, args.port)
+elif args.udp:
+    reader = drone_racer.UDPReader(args.port)
 else:
     reader = drone_racer.StdInReader
 
+# Launch the GUI (which will, in turn, start the reader)
 app = drone_racer.Application(reader, args.fancy)
 app.run()

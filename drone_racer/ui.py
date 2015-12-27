@@ -937,7 +937,7 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
             self.activate_loaded()
         def close_race(widget):
             self.label_warmup.modify_font(self.label_font)
-            leaderboard = self.console.send_leaderboard()
+            leaderboard = self.console.compute_leaderboard()
             self.db.update_race(self.race_id, *leaderboard)
             rest.leaderboard(*leaderboard)
             self.race_id = None

@@ -135,11 +135,12 @@ class Console:
         self.rules = None
         self.extra_data = None
 
-    def send_leaderboard(self):
+    def compute_leaderboard(self):
+        """Compute best lap for each drone and filter out dead ones."""
         for drone, best in zip(self.scores, self.bests):
             if drone is not None:
                 b = min(best or (-1,))
-                drone['tour'] = b == -1 and None or b
+                drone['tour'] = None if b == -1 else b
         return [drone for drone in self.scores if drone is not None]
 
     def _check_laps(self, drone):
