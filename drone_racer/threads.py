@@ -106,7 +106,7 @@ class _UDPReader(BaseReader):
         Decode an UDP datagram containing b"C:3" to the tuple ('C', 2).
         """
         # Non-blocking read so this thread will shut down with the application
-        ready, _, _ = select(self._socket, [], [], 0)
+        ready, _, _ = select(self._socket, [], [], 0.05)
         for socket in ready:
             msg = socket.recv(128) # Way too much for messages like <A:1>
             try:
