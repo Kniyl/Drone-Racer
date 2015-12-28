@@ -95,10 +95,9 @@ class _UDPReader(BaseReader):
             valid data is read.
         """
         super().__init__(update_function)
-        self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._socket.bind((iface, port))
-        self._socket.listen(5)
-        self._watch = [self._socket]
+        com = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        com.bind((iface, port))
+        self._socket = [com]
 
     def read_new_value(self):
         """Read input data and return them as a tuple (gate identifier,
@@ -107,27 +106,20 @@ class _UDPReader(BaseReader):
         Decode an UDP datagram containing b"C:3" to the tuple ('C', 2).
         """
         # Non-blocking read so this thread will shut down with the application
-        ready, _, _ = select(self._watch, [], [], 0)
+        ready, _, _ = select(self._socket, [], [], 0)
         for socket in ready:
-            if socket is self._socket:
-                client, _ = socket.accept()
-                self._watch.append(client)
+            msg = socket.recv(128) # Way too much for messages like <A:1>
+            try:
+                gate, drone = mgs.split(b':')
+                gate = gate.decode()
+                # Compensate for the drone numbering vs. its indexing
+                drone = int(drone) - 1
+            except (UnicodeError, ValueError) as e:
+                print('Le message', msg, 'a été reçu mais n’est pas'
+                      'compris par l’application.', file=sys.stderr)
+                print(e, file=sys.stderr)
             else:
-                msg = socket.recv(128) # Way too much for messages like <A:1>
-                socket.shutdown()
-                socket.close()
-                self._watch.remove(socket)
-                try:
-                    gate, drone = mgs.split(b':')
-                    gate = gate.decode()
-                    # Compensate for the drone numbering vs. its indexing
-                    drone = int(drone) - 1
-                except (UnicodeError, ValueError) as e:
-                    print('Le message', msg, 'a été reçu mais n’est pas'
-                          'compris par l’application.', file=sys.stderr)
-                    print(e, file=sys.stderr)
-                else:
-                    return gate, drone
+                return gate, drone
 
 
 class UDPReader:
