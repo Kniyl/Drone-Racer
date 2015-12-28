@@ -94,10 +94,10 @@ class _UDPReader(BaseReader):
           - update_function: the function that will be called each time a
             valid data is read.
         """
-        super().__init__(update_function)
         com = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         com.bind((iface, port))
         self._socket = [com]
+        super().__init__(update_function)
 
     def read_new_value(self):
         """Read input data and return them as a tuple (gate identifier,
@@ -110,7 +110,7 @@ class _UDPReader(BaseReader):
         for socket in ready:
             msg = socket.recv(128) # Way too much for messages like <A:1>
             try:
-                gate, drone = mgs.split(b':')
+                gate, drone = msg.split(b':')
                 gate = gate.decode()
                 # Compensate for the drone numbering vs. its indexing
                 drone = int(drone) - 1
@@ -140,7 +140,7 @@ class UDPReader:
           - callback: the function that will be called each
             time a valid data is read.
         """
-        return _UDPReader(socket.gethostname(), self.port, callback)
+        return _UDPReader(socket.gethostname(), self._port, callback)
 
 
 if XBee is None:
