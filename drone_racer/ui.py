@@ -1,11 +1,6 @@
+from gi.repository import Gtk, GLib, Gio, Gdk, Pango, GdkPixbuf
 from threading import Timer
 from datetime import datetime, timedelta
-
-import gi
-
-gi.require_version('Gtk', '3.0')
-
-from gi.repository import Gtk, GLib, Gio, Gdk, Pango, GdkPixbuf
 
 from .threads import StdInReader
 from .console import Console, ConsoleError, Rules, FreeForAll, Gates
