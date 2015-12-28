@@ -96,7 +96,7 @@ class _UDPReader(BaseReader):
         """
         super().__init__(update_function)
         com = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        com.bind((iface, port))
+        com.bind(((iface, port))
         self._socket = [com]
 
     def read_new_value(self):
