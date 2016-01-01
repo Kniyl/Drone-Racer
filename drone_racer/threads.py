@@ -15,17 +15,26 @@ except ImportError:
 class BaseReader(Thread):
     """Base class for custom data readers."""
 
-    def __init__(self, update_function):
-        """Spawn a thread that continuously read data for drones statuses.
-        
-        Parameter:
-          - update_function: the function that will be called each time a
-            valid data is read.
+    def __init__(self):
+        """Spawn a thread that will continuously read data for drones
+        statuses.
         """
         super().__init__(name="reader")
+
+    def __call__(self, update_function):
+        """Starts the thread with the given callback function to
+        process data with.
+        
+        Parameter:
+          - update_function: the function that will be called each time
+            a valid data is read.
+        """
         self._update_data = update_function
         self._should_continue = True
         self.start()
+        # Return ourselves to allow for duck typing and other classes
+        # to return other kind of objects (see XBeeReader).
+        return self
 
     def run(self):
         """The main action of the thread.
@@ -80,24 +89,23 @@ class StdInReader(BaseReader):
             pass
 
 
-class _UDPReader(BaseReader):
-    """Read data from UDP datagrams. Used when communicating via WiFi
-    with the gates.
+class UDPReader(BaseReader):
+    """Read data from UDP datagrams. Used when communicating via
+    WiFi with the gates.
     """
 
-    def __init__(self, iface, port, update_function):
-        """Spawn a thread that continuously read data for drones statuses.
+    def __init__(self, port):
+        """Spawn a thread that continuously read data for drones
+        statuses.
         
         Parameter:
-          - iface: the address of the interface to listen on.
           - port: the socket port to listen on.
-          - update_function: the function that will be called each time a
-            valid data is read.
         """
+        super().__init__()
         com = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        iface = socket.gethostname()
         com.bind((iface, port))
         self._socket = [com]
-        super().__init__(update_function)
 
     def read_new_value(self):
         """Read input data and return them as a tuple (gate identifier,
@@ -122,45 +130,25 @@ class _UDPReader(BaseReader):
                 return gate, drone
 
 
-class UDPReader:
-    """Factory of _UDPReaders."""
-
-    def __init__(self, port):
-        """Save parameters for future use.
-
-        Parameter:
-          - port: the socket port to listen on.
-        """
-        self._port = port
-
-    def __call__(self, callback):
-        """Generate the appropriate class to read data.
-
-        Parameter:
-          - callback: the function that will be called each
-            time a valid data is read.
-        """
-        return _UDPReader(socket.gethostname(), self._port, callback)
-
-
 if XBee is None:
-    class _BeeReader(BaseReader):
+    class XBeeReader(BaseReader):
         """Read data from a serial port bound to an XBee.
         Dummy implementation because xbee module could not be loaded.
         """
+        
+        def __init__(self, *args, **kwargs):
+            """Accepts arguments to be compatible with the "real"
+            XBeeReader but prints a warning and terminate gracefully
+            instead.
+            """
+            super().__init__()
+            print('Le module XBee est instrouvable. Aucune donnée ne pourra',
+                  'être lue', file=sys.stderr)
 
         def read_new_value(self):
             """Cancel this thread to avoid burning resources."""
             self._should_continue = False
 
-    def XBeeReader(*args, **kwargs):
-        """Wrapper around the xbee module to integrate our _BeeReaderMixin
-        into the appropriate base class.
-        Dummy implementation because xbee module could not be loaded.
-        """
-        print('Le module XBee est instrouvable. Aucune donnée ne pourra',
-              'être lue', file=sys.stderr)
-        return _BeeReader
 else:
     class _BeeReaderMixin:
         """Read data from a serial port bound to an XBee."""
@@ -213,28 +201,25 @@ else:
 
         def __init__(self, *args, **kwargs):
             """Save parameters for future use.
-            Everything is used to initialize a serial.Serial object
-            except for the named attribute 'zigbee' which define the
-            base class to use.
+
+            Every paramater is used to initialize a serial.Serial
+            object except for the named attribute 'zigbee' which
+            define the base class to use.
 
             Parameter:
               - zigbee: whether to use the xbee.ZigBee base class or
                 the xbee.XBee one
             """
             zigbee = kwargs.pop('zigbee', False)
-            self._args = args
-            self._kwargs = kwargs
-            self._base_cls = ZigBee if zigbee else XBee
+            base_cls = ZigBee if zigbee else XBee
+            self._serial = Serial(*args, **kwargs)
+            self._cls = type('XBeeReader', (_BaseReaderMixin, base_cls), {})
 
         def __call__(self, callback):
-            """Generate the appropriate class to read data.
+            """Generate the appropriate object to read data.
 
             Parameter:
               - callback: the function that will be called each
                 time a valid data is read.
             """
-            serial = Serial(*self._args, **self._kwargs)
-            self._args = None
-            self._kwargs = None
-            return type('XBeeReader', (_BeeReaderMixin, self._base_cls), {})(
-                    serial, callback)
+            return self._cls(self._serial, callback)

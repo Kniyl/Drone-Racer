@@ -38,7 +38,7 @@ if args.serial is not None:
 elif args.udp:
     reader = drone_racer.UDPReader(args.port)
 else:
-    reader = drone_racer.StdInReader
+    reader = drone_racer.StdInReader()
 
 # Launch the GUI (which will, in turn, start the reader)
 app = drone_racer.Application(reader, args.fancy)
