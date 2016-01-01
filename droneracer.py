@@ -1,3 +1,24 @@
+"""Drone Racer is a project primarily developed for the DroneFest
+organized as part of the FabLab Festival 2015. Its aim is to provide
+an all-in-one interface for races organizers to:
+
+  - create different events for drones competition;
+  - register contestants and their associated drones;
+  - classify drones into categories;
+  - create several routes with their own set of rules for each event;
+  - setup and monitor races on a designated route;
+  - gather statistics on races for drivers, event or kind of route.
+
+To reduce the overhead of having extraneous services for database
+access, Drone Racer makes use of the python's built-in sqlite module.
+It uses it to store informations on the contestants, the drones, the
+different type of routes and the races leaderboards.
+
+Additionally, setup, updates & leaderboard for each race can be sent
+to a RESTful API for the audience.
+"""
+
+
 import os
 
 from argparse import ArgumentParser

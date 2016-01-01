@@ -1,4 +1,15 @@
-# Lots of duck typing in this file, maybe we can try to do better
+"""Collection of classes to crete threaded objects allowing to read
+data from various sources.
+
+Readers should be created with whatever parameter they require and
+then allow to be called with a callback function. This call return
+the threaded object reading data.
+
+These threaded objects are started immediatly and monitor incomming
+data to normalize them before feeding them into the callback function.
+They can easily be halted using their `stop` method.
+"""
+
 
 import os
 import sys
@@ -39,8 +50,8 @@ class BaseReader(Thread):
     def run(self):
         """The main action of the thread.
 
-        Wait for data, read them and send them to the rest of the application
-        for further computation.
+        Wait for data, read them and send them to the rest of the
+        application for further computation.
         """
         while self._should_continue:
             try:
@@ -55,8 +66,8 @@ class BaseReader(Thread):
         self._should_continue = False
 
     def read_new_value(self):
-        """Read input data and return them as a tuple (gate identifier, drone
-        number). Subclasses must implement this method.
+        """Read input data and return them as a tuple (gate identifier,
+        drone number). Subclasses must implement this method.
         """
         raise NotImplementedError("Subclasses must implement this method")
 
@@ -135,7 +146,7 @@ if XBee is None:
         """Read data from a serial port bound to an XBee.
         Dummy implementation because xbee module could not be loaded.
         """
-        
+
         def __init__(self, *args, **kwargs):
             """Accepts arguments to be compatible with the "real"
             XBeeReader but prints a warning and terminate gracefully
@@ -194,15 +205,16 @@ else:
             self.halt()
             self.serial.close()
 
+
     class XBeeReader:
-        """Wrapper around the xbee module to integrate our _BeeReaderMixin
-        into the appropriate base class.
+        """Wrapper around the xbee module to integrate our
+        _BeeReaderMixin into the appropriate base class.
         """
 
         def __init__(self, *args, **kwargs):
             """Save parameters for future use.
 
-            Every paramater is used to initialize a serial.Serial
+            Every parameter is used to initialize a serial.Serial
             object except for the named attribute 'zigbee' which
             define the base class to use.
 
