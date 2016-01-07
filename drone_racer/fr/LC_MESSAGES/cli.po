@@ -1,0 +1,63 @@
+# Translations template for PROJECT.
+# Copyright (C) 2016 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2016.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2016-01-06 23:44+0100\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.1.1\n"
+
+#: ../droneracer.py:34
+msgid "\"Drone Racer\"'s Graphical User Interface"
+msgstr "Interface graphique \"Drone Racer\""
+
+#: ../droneracer.py:37
+msgid "Use a fancier (Gtk3 like) titlebar for the GUI"
+msgstr "Utilise une barre de titre un peu plus Gtk3"
+
+#: ../droneracer.py:39
+msgid ""
+"List off all communication channels to get data from the gates. If none "
+"is selected, data will be read from stdin."
+msgstr "Liste des moyens de communication permettant de recevoir les données des"
+" portes. Si aucun module de communication n’est sélectionné, les "
+"données sont lues sur l’entrée standard."
+
+#: ../droneracer.py:42
+msgid "More options are available per channel"
+msgstr "Des options supplémentaires sont disponibles par module"
+
+#: ../droneracer.py:46
+msgid "Communication through XBee frames"
+msgstr "Envoi de trames XBee"
+
+#: ../droneracer.py:49
+msgid "Serial file mapped to the XBee pins"
+msgstr "Spécifie le port série à utiliser pour récupérer les "
+"informations provenant du XBee"
+
+#: ../droneracer.py:52
+msgid "Switch indicating wether it is an XBee or a ZigBee"
+msgstr "Spécifie si le module XBee est un ZigBee"
+
+#: ../droneracer.py:55
+msgid "Serial port communication speed"
+msgstr "Débit du port série utilisé pour la connexion avec le module XBee"
+
+#: ../droneracer.py:59
+msgid "Communication through UDP datagrams"
+msgstr "Envoi de datagrammes UDP"
+
+#: ../droneracer.py:62
+msgid "Socket port to listen on"
+msgstr "Port à utiliser pour l’écoute UDP"
+

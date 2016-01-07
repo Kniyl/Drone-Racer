@@ -22,6 +22,11 @@ try:
 except ImportError:
     XBee = None
 
+from .i18n import translations
+
+
+_, _n = translations('utils')
+
 
 class BaseReader(Thread):
     """Base class for custom data readers."""
@@ -69,7 +74,7 @@ class BaseReader(Thread):
         """Read input data and return them as a tuple (gate identifier,
         drone number). Subclasses must implement this method.
         """
-        raise NotImplementedError("Subclasses must implement this method")
+        raise NotImplementedError(_("Subclasses must implement this method"))
 
     def _process_value(self, gate, drone):
         """Send input data to the rest of the application.
@@ -134,8 +139,8 @@ class UDPReader(BaseReader):
                 # Compensate for the drone numbering vs. its indexing
                 drone = int(drone) - 1
             except (UnicodeError, ValueError) as e:
-                print('Le message', msg, 'a été reçu mais n’est pas'
-                      'compris par l’application.', file=sys.stderr)
+                print(_('Received unparsable message: {}').format(msg),
+                        file=sys.stderr)
                 print(e, file=sys.stderr)
             else:
                 return gate, drone
@@ -153,8 +158,8 @@ if XBee is None:
             instead.
             """
             super().__init__()
-            print('Le module XBee est instrouvable. Aucune donnée ne pourra',
-                  'être lue', file=sys.stderr)
+            print(_('Can not load XBee module. No data will be received'),
+                    file=sys.stderr)
 
         def read_new_value(self):
             """Cancel this thread to avoid burning resources."""
@@ -187,13 +192,11 @@ else:
                 # Compensate for the drone numbering vs. its indexing
                 drone = int(drone) - 1
             except (UnicodeError, ValueError) as e:
-                print('Le message', response_dict['rf_data'],
-                      'a été reçu mais n’est pas compris par l’application.',
-                      file=sys.stderr)
+                print(_('Received unparsable message: {}').format(
+                        response_dict['rf_data']), file=sys.stderr)
                 print(e, file=sys.stderr)
             except KeyError as e:
-                print('Un message ne contenant pas de données a été reçu.',
-                      file=sys.stderr)
+                print(_('Received empty frame'), file=sys.stderr)
                 print(e, file=sys.stderr)
             else:
                 self._update_data(gate, drone)

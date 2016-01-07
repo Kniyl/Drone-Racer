@@ -2,6 +2,10 @@ from threading import Timer
 from enum import Enum
 
 from . import rest
+from .i18n import translations
+
+
+_, _n = translations('utils')
 
 
 class ConsoleError(Exception):
@@ -40,9 +44,7 @@ class Console:
         """
         # Check that no other race is currently started
         if self.extra_data is not None:
-            raise ConsoleError(
-                    'Une course est déjà en cours. '
-                    'Attendez sa fin ou forcez son arrêt.')
+            raise ConsoleError(_('Race ongoing. Stop it or wait for its end'))
         self.scores = [{
             'id': id,
             'position': len(drones),
@@ -66,9 +68,7 @@ class Console:
         """
         # Check that a race has already been configured
         if self.rules is None:
-            raise ConsoleError(
-                    'Aucune course n’a été configurée. '
-                    'Impossible d’annuler.')
+            raise ConsoleError(_('Cancelation failed: no race setup'))
         # Every drone get the same meaningless informations
         for drone in self.scores:
             if drone is not None:
@@ -92,14 +92,10 @@ class Console:
         """Start monitoring events for the last configured race."""
         # Check that there is not a race already started
         if self.extra_data is not None:
-            raise ConsoleError(
-                    'Une course est déjà en cours. '
-                    'Attendez sa fin ou forcez son arrêt.')
+            raise ConsoleError(_('Race ongoing. Stop it or wait for its end'))
         # Check that a race has already been configured
         if self.rules is None:
-            raise ConsoleError(
-                    'Impossible de démarrer : '
-                    'aucune course configurée')
+            raise ConsoleError(_('Can not start race: no race setup'))
         start = self.rules.common_start
         t_out = self.rules.timeout / 10 if self.rules.timeout else None
         self.extra_data = [{
@@ -118,7 +114,7 @@ class Console:
         """Halt the current race and stop monitoring for events."""
         # Check that there is a race already started
         if self.extra_data is None:
-            raise ConsoleError('Il n’y a pas de course démarrée.')
+            raise ConsoleError(_('No race to stop'))
         rest.finish()
         # Update status for drones that don't already cleared the race
         time = self.timer()
@@ -281,9 +277,11 @@ class Console:
         try:
             best[lap-1] += amount
         except IndexError:
-            raise ConsoleError('Ce drone n’a fait que {} tours. '
-                    'Impossible de modifier le {}{}.'.format(
-                        len(best), lap, lap == 1 and 'er' or 'eme'))
+            raise ConsoleError(_n(
+                'This drone flew for only {} rounds. '
+                'Can not modify the first one.',
+                'This drone flew for only {} rounds. '
+                'Can not modify the {}th one.', lap).format(len(best), lap))
         else:
             if lap == len(best):
                 drone = self.scores[drone-1]
@@ -356,9 +354,9 @@ class Rules:
               - identification letter(s) for the next gate after this one
         """
         if strict and not timeout:
-            raise ConsoleError(
-                    'Un temps de course doit être défini '
-                    'lorsque l’option stricte est activée')
+            raise ConsoleError(_(
+                    'Strict mode was specified: '
+                    'time for the race is missing.'))
         # Account for the fact that the timer counts in tenths of seconds
         # and the timeout value is given in seconds
         self.timeout = timeout * 10 or None
@@ -369,13 +367,12 @@ class Rules:
         # Check that there is at most one starting mark
         self.common_start = len([b for b in gates_type if Gates(b).is_start])
         if self.common_start > 1:
-            raise ConsoleError('Trop de portes de départ')
+            raise Consoleerror(_('Too much starting gates specified'))
         # Whether or not all drones share the same timer
         self.common_start = not self.common_start
         # Check that there is one and only one finish line
         if len([b for b in gates_type if Gates(b).is_end]) != 1:
-            raise ConsoleError('Une (et une seule) ligne d’arrivée '
-                               'doit être définie')
+            raise ConsoleError(_('Only one finish line must be specified'))
         # Check for the route ordering
         self.gates = {v[0]: {
                 'type': v[1],
@@ -388,10 +385,9 @@ class Rules:
             for b,v in self.gates.items():
                 self.gates[v['next']].setdefault('previous', []).append(b)
         except KeyError:
-            raise ConsoleError(
-                    'La porte suivant la porte "{0}" '
-                    'a été définie à "{1}" mais la porte "{1}" '
-                    'n’existe pas'.format(b, v['next']))
+            raise ConsoleError(_(
+                    'The gate following gate "{0}" is set to "{1}" but '
+                    'gate "{1}" does not exist').format(b, v['next']))
 
     def get_setup(self):
         """Return this route and rules definition in a JSON-ready
@@ -502,14 +498,12 @@ class FreeForAll(Rules):
         # Check that there is at most one starting mark
         self.common_start = len([b for b in gates_type if Gates(b).is_start])
         if self.common_start > 1:
-            raise ConsoleError('Trop de portes de départ')
+            raise ConsoleError('Too much starting lines')
         # Whether or not all drones share the same timer
         self.common_start = not self.common_start
         # Check that there is no finish line
         if len([b for b in gates_type if Gates(b).is_end]):
-            raise ConsoleError(
-                    'Une porte d’arrivée n’a pas de sens dans '
-                    'un contexte où les portes ne sont pas ordonnées')
+            raise ConsoleError(_('There is no finish line in unordered mode'))
         self.gates = {v[0]: {
                 'type': v[1],
                 'pts': v[2],

@@ -1,0 +1,104 @@
+# Translations template for PROJECT.
+# Copyright (C) 2016 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2016.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2016-01-07 22:14+0100\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.1.1\n"
+
+#: console.py:47 console.py:95
+msgid "Race ongoing. Stop it or wait for its end"
+msgstr "Une course est déjà en cours. Attendez sa fin ou forcez son arrêt."
+
+#: console.py:71
+msgid "Cancelation failed: no race setup"
+msgstr "Aucune course n’a été configurée. Impossible d’annuler."
+
+#: console.py:98
+msgid "Can not start race: no race setup"
+msgstr "Impossible de démarrer : aucune course configurée"
+
+#: console.py:117
+msgid "No race to stop"
+msgstr "Il n’y a pas de course démarrée."
+
+#: console.py:280
+msgid "This drone flew for only {} rounds. Can not modify the first one."
+msgid_plural "This drone flew for only {} rounds. Can not modify the {}th one."
+msgstr[0] "Ce drone n’a fait que {} tours. Impossible de modifier le premier."
+msgstr[1] "Ce drone n’a fait que {} tours. Impossible de modifier le {}eme."
+
+#: console.py:357
+msgid "Strict mode was specified: time for the race is missing."
+msgstr "Un temps de course doit être défini lorsque l’option stricte est activée"
+
+#: console.py:370
+msgid "Too much starting gates specified"
+msgstr "Trop de portes de départ"
+
+#: console.py:375
+msgid "Only one finish line must be specified"
+msgstr "Une (et une seule) ligne d’arrivée doit être définie"
+
+#: console.py:388
+msgid ""
+"The gate following gate \"{0}\" is set to \"{1}\" but gate \"{1}\" does "
+"not exist"
+msgstr "La porte suivant la porte \"{0}\" a été définie à \"{1}\" mais la "
+"porte \"{1}\" n’existe pas"
+
+#: console.py:506
+msgid "There is no finish line in unordered mode"
+msgstr "Une porte d’arrivée n’a pas de sens dans "
+"un contexte où les portes ne sont pas ordonnées"
+
+#: rest.py:33
+msgid "REST request {} failed:"
+msgstr "La requete REST {} a échoué :"
+
+#: sql.py:105
+msgid "Corrupted database encountered. Aborting."
+msgstr "La base de donnée est corrompue. Abandon."
+
+#: sql.py:244 sql.py:348 sql.py:380
+msgid "No event loaded; can not retrieve associated games."
+msgstr "Vous n’avez pas chargé d’évènement. Impossible de voir les jeux associés."
+
+#: sql.py:279
+msgid "No event loaded; can not register a new race"
+msgstr "Vous n’avez pas chargé d’évènement. Impossible d’enregistrer une course."
+
+#: sql.py:492
+msgid "Database creation failed: file already exists"
+msgstr "Une base de donnée ne peut pas être créée car le fichier existe déjà"
+
+#: sql.py:503
+msgid "Opening database failed: no such file"
+msgstr "La base de donnée ne peut pas être ouverte car le fichier n’existe pas"
+
+#: threads.py:77
+msgid "Subclasses must implement this method"
+msgstr "Les clases dérivées doivent implémenter cette méthode"
+
+#: threads.py:142 threads.py:195
+msgid "Received unparsable message: {}"
+msgstr "Le message {} a été reçu mais n’est pas compris par l’application."
+
+#: threads.py:161
+msgid "Can not load XBee module. No data will be received"
+msgstr "Le module XBee est introuvable. Aucune donnée ne pourra àtre lue."
+
+#: threads.py:199
+msgid "Received empty frame"
+msgstr "Un message ne contenant pas de données a été reçu"
+

@@ -9,6 +9,10 @@ try:
 except ImportError:
     import json
 
+from .i18n import translations
+
+
+_, _n = translations('utils')
 
 # Default address for the server providing the REST API
 _REST_ADDR = 'http://localhost/'
@@ -26,7 +30,7 @@ def _execute_request(verb, path, **kwargs):
     try:
         request(verb, _REST_ADDR + path, **kwargs)
     except RequestException as e:
-        print('REST request', path[:-1], 'failed:', file=stderr)
+        print(_('REST request {} failed:').format(path[:-1]), file=stderr)
         for pretty_print in traceback.format_exception_only(type(e), e):
             print(pretty_print, file=stderr)
 

@@ -22,44 +22,57 @@ to a RESTful API for the audience.
 import os
 
 from argparse import ArgumentParser
+from drone_racer.i18n import translations
 import drone_racer
 
 
-# Be sure to be at the right place for relative path of images in Gtk
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
+_, _N = translations('cli')
+XBEE_NAMES = 'xbee', 'bee', 'serial'
+UDP_NAMES = 'udp', 'wifi'
 
-parser = ArgumentParser(description='Interface graphique "Drone Racer"')
 
-# GUI args
-parser.add_argument('--fancy-title', dest='fancy', action='store_true',
-                    help='Utilise une barre de titre un peu plus Gtk3')
+parser = ArgumentParser(description=_('"Drone Racer"\'s Graphical User Interface'))
+parser.add_argument(
+        '--fancy-title', dest='fancy', action='store_true',
+        help=_('Use a fancier (Gtk3 like) titlebar for the GUI'))
+subparsers = parser.add_subparsers(
+        title='communication', dest='reader', description=_('List off all '
+        'communication channels to get data from the gates. If none is '
+        'selected, data will be read from stdin.'), metavar='DATA_LINK',
+        help=_('More options are available per channel'))
 
-# XBee args
-parser.add_argument('--serial-port', dest='serial', metavar='FILE',
-                    default=None, help='Spécifie le port série à utiliser '
-                    'pour récupérer les informations provenant du XBee')
-parser.add_argument('--zigbee', dest='zigbee', action='store_true',
-                    help='Spécifie si le module XBee est un ZigBee')
-parser.add_argument('--baudrate', dest='baudrate', metavar='BPS',
-                    type=int, default=9600, help='Débit du port série '
-                    'utilisé pour la connexion avec le module XBee')
+name, *aliases = XBEE_NAMES
+bee_parser = subparsers.add_parser(
+        name, aliases=aliases, help=_('Communication through XBee frames'))
+bee_parser.add_argument(
+        'device', metavar='FILE', default=None,
+        help=_('Serial file mapped to the XBee pins'))
+bee_parser.add_argument(
+        '--zigbee', dest='zigbee', action='store_true',
+        help=_('Switch indicating wether it is an XBee or a ZigBee'))
+bee_parser.add_argument(
+        '--baudrate', dest='baudrate', metavar='BPS', type=int, default=9600,
+        help=_('Serial port communication speed'))
 
-# UDP args
-parser.add_argument('--use-udp', dest='udp', action='store_true',
-                    help='Spécifie si la communication doit se faire '
-                    'par datagrames UDP.')
-parser.add_argument('--port', dest='port', metavar='NUM', type=int,
-                    default=4387, help='Port à utiliser pour l’écoute UDP')
+name, *aliases = UDP_NAMES
+udp_parser = subparsers.add_parser(
+        name, aliases=aliases, help=_('Communication through UDP datagrams'))
+udp_parser.add_argument(
+        '--port', dest='port', metavar='NUM', type=int, default=4387,
+        help=_('Socket port to listen on'))
 
 # Choose the appropriate reader
 args = parser.parse_args()
-if args.serial is not None:
+if args.reader in XBEE_NAMES:
     reader = drone_racer.XBeeReader(
             args.serial, args.baudrate, zigbee=args.zigbee)
-elif args.udp:
+elif args.reader in UDP_NAMES:
     reader = drone_racer.UDPReader(args.port)
 else:
     reader = drone_racer.StdInReader()
+
+# Be sure to be at the right place for relative path of images in Gtk
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # Launch the GUI (which will, in turn, start the reader)
 app = drone_racer.Application(reader, args.fancy)

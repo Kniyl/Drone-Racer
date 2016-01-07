@@ -1,6 +1,10 @@
 import os.path
 from random import shuffle
 from sqlite3 import connect, DatabaseError, IntegrityError
+from .i18n import translations
+
+
+_, _n = translations('utils')
 
 
 class SQLError(Exception):
@@ -98,7 +102,7 @@ class Database:
             # Quick integrity check, just in case the opened database has
             # nothing to do with our application
             if test != [(0,)]:
-                raise SQLError('La base de donnée est corrompue. Abandon.')
+                raise SQLError(_('Corrupted database encountered. Aborting.'))
         self.conn = c
         self.id = -1
 
@@ -237,9 +241,8 @@ class Database:
         """
         if self.id < 0:
             # Can't register the route if no event is bound to this object
-            raise SQLError(
-                'Vous n’avez pas chargé d’évènement. '
-                'Impossible de voir les jeux associés.')
+            raise SQLError(_('No event loaded; '
+                             'can not retrieve associated games.'))
         try:
             query = 'INSERT INTO jeux(event_id, intitule, nb_drones, '\
                     'temps_max, tours_min, free_fly, strict) '\
@@ -273,9 +276,7 @@ class Database:
         """
         if self.id < 0:
             # Can't register the race if no event is bound to this object
-            raise SQLError(
-                'Vous n’avez pas chargé d’évènement. '
-                'Impossible d’enregistrer une course.')
+            raise SQLError(_('No event loaded; can not register a new race'))
         query = 'SELECT id FROM jeux WHERE event_id=? and intitule=?'
         game_id, = self._execute(query, self.id, game_name).fetchone()
         query = 'INSERT INTO courses(jeu_id) VALUES (?)'
@@ -344,9 +345,8 @@ class Database:
         """
         if self.id < 0:
             # Can't query the routes names if no event is bound to this object
-            raise SQLError(
-                'Vous n’avez pas chargé d’évènement. '
-                'Impossible de voir les jeux associés.')
+            raise SQLError(_('No event loaded; '
+                             'can not retrieve associated games.'))
         query = 'SELECT intitule FROM jeux WHERE event_id=?'
         return (row[0] for row in self._execute(query, self.id))
 
@@ -377,9 +377,8 @@ class Database:
         if self.id < 0:
             # Can't query the routes custom rules if no event
             # is bound to this object
-            raise SQLError(
-                'Vous n’avez pas chargé d’évènement. '
-                'Impossible de voir les jeux associés.')
+            raise SQLError(_('No event loaded; '
+                             'can not retrieve associated games.'))
         query = 'SELECT id,nb_drones,temps_max,tours_min,free_fly,strict '\
                 'FROM jeux WHERE event_id=? and intitule=?'
         game_id, count, time, laps, free, strict =\
@@ -490,9 +489,7 @@ def sql_create(filename):
     if os.path.splitext(filename)[-1] != '.sqlite':
         filename += '.sqlite'
     if os.path.isfile(filename):
-        raise SQLError(
-                'Une base de donnée ne peut pas être créée '
-                'car le fichier existe déjà')
+        raise SQLError(_('Database creation failed: file already exists'))
     return Database(filename, True)
 
 def sql_open(filename):
@@ -503,7 +500,5 @@ def sql_open(filename):
     Return the database wrapper object around this file.
     """
     if not os.path.isfile(filename):
-        raise SQLError(
-                'La base de donnée ne peut pas être ouverte '
-                'car le fichier n’existe pas')
+        raise SQLError(_('Opening database failed: no such file'))
     return Database(filename)
