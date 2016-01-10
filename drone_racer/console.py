@@ -172,10 +172,10 @@ class Console:
         """React to events on the race as sent by the reader thread and
         update drone statuses accordingly.
         """
-        # Does not process anything when no race is started
+        # Do not process anything when no race is started
         if self.extra_data is None:
             return
-        # Does not process data for a gate that is not activated for this race
+        # Do not process data for a gate that is not activated for this race
         if not (gate in self.gates and 0 <= drone < len(self.scores)):
             return
         time = self.timer()
