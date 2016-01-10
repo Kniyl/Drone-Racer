@@ -1,4 +1,4 @@
-"""Pubilc interface to the various components defined in this package.
+"""Public interface to the various components defined in this package.
 
 Allows to construct the GUI responsible of the whole application
 and to select a reader from the built-in ones.

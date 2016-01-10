@@ -4,7 +4,7 @@ from sqlite3 import connect, DatabaseError, IntegrityError
 from .i18n import translations
 
 
-_, _n = translations('utils')
+_, _N = translations('utils')
 
 
 class SQLError(Exception):

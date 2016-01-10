@@ -1,4 +1,4 @@
-"""Collection of classes to crete threaded objects allowing to read
+"""Collection of classes to create threaded objects allowing to read
 data from various sources.
 
 Readers should be created with whatever parameter they require and
@@ -25,7 +25,7 @@ except ImportError:
 from .i18n import translations
 
 
-_, _n = translations('utils')
+_, _N = translations('utils')
 
 
 class BaseReader(Thread):
@@ -62,9 +62,10 @@ class BaseReader(Thread):
             try:
                 gate, drone = self.read_new_value()
             except TypeError:
+                # read_new_value returned None, errors already handled
                 pass
             else:
-                self._process_value(gate, drone)
+                self._update_data(gate, drone)
 
     def stop(self):
         """Signal that the thread has to stop reading its inputs."""
@@ -75,17 +76,6 @@ class BaseReader(Thread):
         drone number). Subclasses must implement this method.
         """
         raise NotImplementedError(_("Subclasses must implement this method"))
-
-    def _process_value(self, gate, drone):
-        """Send input data to the rest of the application.
-
-        Parameters:
-          - gate: the gate identification letter(s)
-          - drone: the drone identification number (0-based)
-        """
-        if drone < 0:
-            return
-        self._update_data(gate, drone)
 
 
 class StdInReader(BaseReader):
@@ -228,7 +218,7 @@ else:
             zigbee = kwargs.pop('zigbee', False)
             base_cls = ZigBee if zigbee else XBee
             self._serial = Serial(*args, **kwargs)
-            self._cls = type('XBeeReader', (_BaseReaderMixin, base_cls), {})
+            self._cls = type('XBeeReader', (_BeeReaderMixin, base_cls), {})
 
         def __call__(self, callback):
             """Generate the appropriate object to read data.

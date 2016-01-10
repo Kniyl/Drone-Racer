@@ -12,7 +12,7 @@ except ImportError:
 from .i18n import translations
 
 
-_, _n = translations('utils')
+_, _N = translations('utils')
 
 # Default address for the server providing the REST API
 _REST_ADDR = 'http://localhost/'

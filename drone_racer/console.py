@@ -5,7 +5,7 @@ from . import rest
 from .i18n import translations
 
 
-_, _n = translations('utils')
+_, _N = translations('utils')
 
 
 class ConsoleError(Exception):
@@ -277,7 +277,7 @@ class Console:
         try:
             best[lap-1] += amount
         except IndexError:
-            raise ConsoleError(_n(
+            raise ConsoleError(_N(
                 'This drone flew for only {} rounds. '
                 'Can not modify the first one.',
                 'This drone flew for only {} rounds. '
