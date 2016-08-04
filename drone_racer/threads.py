@@ -11,11 +11,9 @@ They can easily be halted using their `stop` method.
 """
 
 
-import os
 import sys
 import socket
 from threading import Thread
-from select import select
 try:
     from serial import Serial
     from xbee import XBee, ZigBee
@@ -108,10 +106,11 @@ class UDPReader(BaseReader):
           - port: the socket port to listen on.
         """
         super().__init__()
-        com = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         iface = socket.gethostname()
-        com.bind((iface, port))
-        self._socket = [com]
+        self.socket.bind((iface, port))
+        # Non-blocking read so this thread will shut down with the application
+        self.socket.settimeout(1)
 
     def read_new_value(self):
         """Read input data and return them as a tuple (gate identifier,
@@ -119,21 +118,65 @@ class UDPReader(BaseReader):
 
         Decode an UDP datagram containing b"C:3" to the tuple ('C', 2).
         """
+        try:
+            msg = self.socket.recv(128) # Way too much for messages like <A:1>
+        except socket.timeout:
+            return
+        try:
+            gate, drone = msg.split(b':')
+            gate = gate.decode()
+            # Compensate for the drone numbering vs. its indexing
+            drone = int(drone) - 1
+        except (UnicodeError, ValueError) as e:
+            print(_('Received unparsable message: {}').format(msg),
+                    file=sys.stderr)
+            print(e, file=sys.stderr)
+        else:
+            return gate, drone
+
+
+class TCPReader(BaseReader):
+    """Read data from TCP frames. Used when communicating via
+    WiFi with the gates.
+    """
+
+    def __init__(self, port):
+        """Spawn a thread that continuously read data for drones
+        statuses.
+        
+        Parameter:
+          - port: the socket port to listen on.
+        """
+        super().__init__()
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        iface = socket.gethostname()
+        self.socket.bind((iface, port))
+        self.socket.listen(10)
         # Non-blocking read so this thread will shut down with the application
-        ready, _, _ = select(self._socket, [], [], 0.05)
-        for socket in ready:
-            msg = socket.recv(128) # Way too much for messages like <A:1>
-            try:
-                gate, drone = msg.split(b':')
-                gate = gate.decode()
-                # Compensate for the drone numbering vs. its indexing
-                drone = int(drone) - 1
-            except (UnicodeError, ValueError) as e:
-                print(_('Received unparsable message: {}').format(msg),
-                        file=sys.stderr)
-                print(e, file=sys.stderr)
-            else:
-                return gate, drone
+        self.socket.settimeout(1)
+
+    def read_new_value(self):
+        """Read input data and return them as a tuple (gate identifier,
+        drone number).
+
+        Decode an UDP datagram containing b"C:3" to the tuple ('C', 2).
+        """
+        try:
+            connection = self.socket.accept()
+            msg = connection.recv(128) # Way too much for messages like <A:1>
+        except socket.timeout:
+            return
+        try:
+            gate, drone = msg.split(b':')
+            gate = gate.decode()
+            # Compensate for the drone numbering vs. its indexing
+            drone = int(drone) - 1
+        except (UnicodeError, ValueError) as e:
+            print(_('Received unparsable message: {}').format(msg),
+                    file=sys.stderr)
+            print(e, file=sys.stderr)
+        else:
+            return gate, drone
 
 
 if XBee is None:

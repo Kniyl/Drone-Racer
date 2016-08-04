@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 from .threads import StdInReader
 from .console import Console, ConsoleError, Rules, FreeForAll, Gates
-from .sql import sql_create, sql_open, SQLError
+from .sql import Database, SQLError
 from . import rest
 
 try:
@@ -1313,16 +1313,16 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         self._load_database(
             'Créer une nouvelle base de donnée',
             Gtk.FileChooserAction.SAVE,
-            'Enregistrer', 'document-save', sql_create)
+            'Enregistrer', 'document-save')
 
     def open_database(self, *extra_args):
         """Open an existing database and use it for this session."""
         self._load_database(
             'Sélectionnez la base de donnée à ouvrir',
             Gtk.FileChooserAction.OPEN,
-            'Ouvrir', 'document-open', sql_open)
+            'Ouvrir', 'document-open')
 
-    def _load_database(self, title, action, dialog_ok, icon, sql_generate):
+    def _load_database(self, title, action, dialog_ok, icon):
         """Factorization of code to open or create a database.
         Create a file chooser and use the specified file as the database
         for this session.
@@ -1344,7 +1344,7 @@ class DroneRacerWindow(Gtk.ApplicationWindow):
         # Close any previously opened database and try to open the new one
         self.close_database()
         try:
-            self.db = sql_generate(filename)
+            self.db = Database(filename)
         except SQLError as e:
             dialog = WaitDialog(self, 'Une erreur est survenue', e.args[0])
             dialog.run()

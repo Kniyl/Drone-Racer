@@ -1,6 +1,6 @@
 import os.path
-from random import shuffle
-from sqlite3 import connect, DatabaseError, IntegrityError
+import sqlite3
+from string import ascii_uppercase as LETTERS
 from .i18n import translations
 
 
@@ -20,91 +20,104 @@ class Database:
     Provide access to underlying data through methods rather than SQL queries.
     """
 
-    def __init__(self, filename, create=False):
-        """Open a database and quickly check its integrity.
-
-        Parameter:
-          - create: whether or not this database is new and should have its
-            tables created
-        """
+    def __init__(self, filename):
+        """Open a database and quickly check its integrity."""
         try:
-            c = connect(filename)
+            c = sqlite3.connect(filename)
             c.execute('PRAGMA foreign_keys = ON')
-            if create:
-                with c:
-                    cur = c.cursor()
-                    cur.execute('CREATE TABLE check_integrity '
-                            '(id integer PRIMARY KEY)')
-                    cur.execute('INSERT INTO check_integrity VALUES (0)')
-                    cur.execute('CREATE TABLE events '
-                            '(id integer PRIMARY KEY, '
-                            'nom text UNIQUE NOT NULL, '
-                            'nb_portes integer NOT NULL)')
-                    cur.execute('CREATE TABLE pilotes '
-                            '(id integer PRIMARY KEY, '
-                            'nom text UNIQUE NOT NULL, '
-                            'telephone text NOT NULL, '
-                            'mail text NOT NULL)')
-                    cur.execute('CREATE TABLE drones '
-                            '(id integer PRIMARY KEY, '
-                            'designation text UNIQUE NOT NULL, '
-                            'category text)')
-                    cur.execute('CREATE TABLE pilotes_drones_lien '
-                            '(id integer PRIMARY KEY, '
-                            'pilote_id integer NOT NULL, '
-                            'drone_id integer NOT NULL, '
-                            'FOREIGN KEY(pilote_id) REFERENCES pilotes(id), '
-                            'FOREIGN KEY(drone_id) REFERENCES drones(id))')
-                    cur.execute('CREATE TABLE jeux '
-                            '(id integer PRIMARY KEY, '
-                            'event_id integer NOT NULL, '
-                            'intitule text NOT NULL, '
-                            'nb_drones integer NOT NULL, '
-                            'temps_max integer NOT NULL, '
-                            'tours_min integer NOT NUlL, '
-                            'free_fly boolean NOT NULL, '
-                            'strict boolean NOT NULL, '
-                            'UNIQUE(event_id, intitule) ON CONFLICT ROLLBACK, '
-                            'FOREIGN KEY(event_id) REFERENCES events(id))')
-                    cur.execute('CREATE TABLE portes_jeu '
-                            '(id integer PRIMARY KEY, '
-                            'jeu_id integer NOT NULL, '
-                            'porte text NOT NULL, '
-                            'type integer NOT NULL, '
-                            'points integer NOT NULL, '
-                            'suivant text NOT NULL, '
-                            'FOREIGN KEY(jeu_id) REFERENCES jeux(id))')
-                    cur.execute('CREATE TABLE courses '
-                            '(id integer PRIMARY KEY, '
-                            'jeu_id integer NOT NULL, '
-                            'FOREIGN KEY(jeu_id) REFERENCES jeux(id))')
-                    cur.execute('CREATE TABLE coureurs '
-                            '(id integer PRIMARY KEY, '
-                            'course_id integer NOT NULL, '
-                            'pilote_id integer NOT NULL, '
-                            'drone_id integer NOT NULL, '
-                            'balise_id integer NOT NULL, '
-                            'position integer, '
-                            'points integer, '
-                            'temps real, '
-                            'tours integer, '
-                            'best real, '
-                            'termine boolean, '
-                            'retard integer, '
-                            'FOREIGN KEY(course_id) REFERENCES courses(id), '
-                            'FOREIGN KEY(pilote_id) REFERENCES pilotes(id), '
-                            'FOREIGN KEY(drone_id) REFERENCES drones(id))')
+            with c:
+                cur = c.cursor()
+                cur.executescript("""
+                CREATE TABLE check_integrity (id integer PRIMARY KEY);
+
+                INSERT INTO check_integrity VALUES (0);
+
+                CREATE TABLE events (
+                    id integer PRIMARY KEY,
+                    nom text UNIQUE NOT NULL,
+                    nb_portes integer NOT NULL
+                );
+
+                CREATE TABLE pilotes (
+                    id integer PRIMARY KEY,
+                    nom text UNIQUE NOT NULL,
+                    telephone text NOT NULL,
+                    mail text NOT NULL
+                );
+
+                CREATE TABLE drones (
+                    id integer PRIMARY KEY,
+                    designation text UNIQUE NOT NULL,
+                    category text
+                );
+
+                CREATE TABLE pilotes_drones_lien (
+                    id integer PRIMARY KEY,
+                    pilote_id integer NOT NULL,
+                    drone_id integer NOT NULL,
+                    FOREIGN KEY(pilote_id) REFERENCES pilotes(id),
+                    FOREIGN KEY(drone_id) REFERENCES drones(id)
+                );
+
+                CREATE TABLE jeux (
+                    id integer PRIMARY KEY,
+                    event_id integer NOT NULL,
+                    intitule text NOT NULL,
+                    nb_drones integer NOT NULL,
+                    temps_max integer NOT NULL,
+                    tours_min integer NOT NUlL,
+                    free_fly boolean NOT NULL,
+                    strict boolean NOT NULL,
+                    UNIQUE(event_id, intitule) ON CONFLICT ROLLBACK,
+                    FOREIGN KEY(event_id) REFERENCES events(id)
+                );
+
+                CREATE TABLE portes_jeu (
+                    id integer PRIMARY KEY,
+                    jeu_id integer NOT NULL,
+                    porte text NOT NULL,
+                    type integer NOT NULL,
+                    points integer NOT NULL,
+                    suivant text NOT NULL,
+                    FOREIGN KEY(jeu_id) REFERENCES jeux(id)
+                );
+
+                CREATE TABLE courses (
+                    id integer PRIMARY KEY,
+                    jeu_id integer NOT NULL,
+                    FOREIGN KEY(jeu_id) REFERENCES jeux(id)
+                );
+
+                CREATE TABLE coureurs (
+                    id integer PRIMARY KEY,
+                    course_id integer NOT NULL,
+                    pilote_id integer NOT NULL,
+                    drone_id integer NOT NULL,
+                    balise_id integer NOT NULL,
+                    position integer,
+                    points integer,
+                    temps real,
+                    tours integer,
+                    best real,
+                    termine boolean,
+                    retard integer,
+                    FOREIGN KEY(course_id) REFERENCES courses(id),
+                    FOREIGN KEY(pilote_id) REFERENCES pilotes(id),
+                    FOREIGN KEY(drone_id) REFERENCES drones(id)
+                );
+                """)
+        except sqlite3.OperationalError:
+            # Most likely trying to create existing tables
+            # Quick integrity check, just in case it was not
             test = c.execute('SELECT * FROM check_integrity').fetchall()
-        except DatabaseError as e:
-            # Warn the user if the database can not be created nor fetched
-            raise SQLError(*e.args)
-        else:
-            # Quick integrity check, just in case the opened database has
-            # nothing to do with our application
             if test != [(0,)]:
                 raise SQLError(_('Corrupted database encountered. Aborting.'))
+        except sqlite3.DatabaseError as e:
+            # Warn the user if the database can not be created nor fetched
+            raise SQLError(*e.args)
+
         self.conn = c
-        self.id = -1
+        self.event = None
 
     def _execute(self, query, *args):
         """Convenient wrapper to auto-commit changes.
@@ -117,7 +130,7 @@ class Database:
     def close(self):
         """Close the connection to the database."""
         self.conn.close()
-        self.id = -1
+        self.event = None
 
     def get_events(self):
         """Return a generator of every event registered in the database."""
@@ -138,13 +151,12 @@ class Database:
         try:
             query = 'INSERT INTO events(nom, nb_portes) VALUES (?, ?)'
             self._execute(query, event_name, nb_gates)
-        except IntegrityError:
+        except sqlite3.IntegrityError:
             pass
 
         query = 'SELECT id,nb_portes FROM events WHERE nom=?'
-        self.id, count = self._execute(query, event_name).fetchone()
+        self.event, count = self._execute(query, event_name).fetchone()
 
-        LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
         # Create the list ['A', 'B', ..., 'AA', 'AB', ..., 'BA', 'BB', ...]
         # as long as needed to fit the number of gates
         possibilities = [x for x in LETTERS]
@@ -180,7 +192,7 @@ class Database:
             query = 'INSERT INTO pilotes(nom, telephone, mail) VALUES (?,?,?)'
             self._execute(query, name, phone, email)
             created = True
-        except IntegrityError:
+        except sqlite3.IntegrityError:
             query = 'UPDATE pilotes SET telephone=?, mail=? WHERE nom=?'
             self._execute(query, phone, email, name)
             created = False
@@ -199,7 +211,7 @@ class Database:
         for drone, category in drones:
             try:
                 self._execute(query, drone, category)
-            except IntegrityError:
+            except sqlite3.IntegrityError:
                 pass
         query = 'SELECT id FROM pilotes WHERE nom=?'
         driver_id, = self._execute(query, driver).fetchone()
@@ -239,7 +251,7 @@ class Database:
         Return whether or not the entry in the database has been created (as
         opposed to updated).
         """
-        if self.id < 0:
+        if self.event is None:
             # Can't register the route if no event is bound to this object
             raise SQLError(_('No event loaded; '
                              'can not retrieve associated games.'))
@@ -247,15 +259,15 @@ class Database:
             query = 'INSERT INTO jeux(event_id, intitule, nb_drones, '\
                     'temps_max, tours_min, free_fly, strict) '\
                     'VALUES (?,?,?,?,?,?,?)'
-            self._execute(query, self.id, name, num, time, laps, free, strict)
+            self._execute(query, self.event, name, num, time, laps, free, strict)
             created = True
-        except IntegrityError:
+        except sqlite3.IntegrityError:
             query = 'UPDATE jeux SET nb_drones=?, temps_max=?, tours_min=?, '\
                     'free_fly=?, strict=? WHERE event_id=? and intitule=?'
-            self._execute(query, num, time, laps, free, strict, self.id, name)
+            self._execute(query, num, time, laps, free, strict, self.event, name)
             created = False
         query = 'SELECT id FROM jeux WHERE event_id=? and intitule=?'
-        game_id, = self._execute(query, self.id, name).fetchone()
+        game_id, = self._execute(query, self.event, name).fetchone()
         query = 'DELETE FROM portes_jeu WHERE jeu_id=?'
         self._execute(query, game_id)
         query = 'INSERT INTO portes_jeu(jeu_id, porte, type, points, suivant) '\
@@ -274,11 +286,11 @@ class Database:
           - contestants: a list of (driver name, drone type, beacon)
             3-items-sequence that will attend the race
         """
-        if self.id < 0:
+        if self.event is None:
             # Can't register the race if no event is bound to this object
             raise SQLError(_('No event loaded; can not register a new race'))
         query = 'SELECT id FROM jeux WHERE event_id=? and intitule=?'
-        game_id, = self._execute(query, self.id, game_name).fetchone()
+        game_id, = self._execute(query, self.event, game_name).fetchone()
         query = 'INSERT INTO courses(jeu_id) VALUES (?)'
         race_id = self._execute(query, game_id).lastrowid
         for driver, drone, beacon in contestants:
@@ -343,12 +355,12 @@ class Database:
         """Fetch the names of all set of custom rules registered for
         the event bound to this object.
         """
-        if self.id < 0:
+        if self.event is None:
             # Can't query the routes names if no event is bound to this object
             raise SQLError(_('No event loaded; '
                              'can not retrieve associated games.'))
         query = 'SELECT intitule FROM jeux WHERE event_id=?'
-        return (row[0] for row in self._execute(query, self.id))
+        return (row[0] for row in self._execute(query, self.event))
 
     def get_games_for_event(self, event):
         """Fetch the names of all set of custom rules registered for
@@ -374,7 +386,7 @@ class Database:
         Parameter:
           - game_name: the name of the route to fetch
         """
-        if self.id < 0:
+        if self.event is None:
             # Can't query the routes custom rules if no event
             # is bound to this object
             raise SQLError(_('No event loaded; '
@@ -382,7 +394,7 @@ class Database:
         query = 'SELECT id,nb_drones,temps_max,tours_min,free_fly,strict '\
                 'FROM jeux WHERE event_id=? and intitule=?'
         game_id, count, time, laps, free, strict =\
-                self._execute(query, self.id, game_name).fetchone()
+                self._execute(query, self.event, game_name).fetchone()
         query = 'SELECT porte,type,points,suivant '\
                 'FROM portes_jeu WHERE jeu_id=?'
         beacons = self._execute(query, game_id).fetchall()
@@ -477,28 +489,3 @@ class Database:
         query = 'UPDATE drones SET category=? WHERE designation=?'
         self._execute(query, category, drone)
 
-
-def sql_create(filename):
-    """Open a file to create a new database into it.
-
-    Ensure that the filename ends with '.sqlite' and make sure it
-    doesn't already exists on the filesystem before opening it.
-
-    Return the database wrapper object around this file.
-    """
-    if os.path.splitext(filename)[-1] != '.sqlite':
-        filename += '.sqlite'
-    if os.path.isfile(filename):
-        raise SQLError(_('Database creation failed: file already exists'))
-    return Database(filename, True)
-
-def sql_open(filename):
-    """Open a file to manage the database in it.
-
-    Ensure that the filename exists on the filesystem before opening it.
-
-    Return the database wrapper object around this file.
-    """
-    if not os.path.isfile(filename):
-        raise SQLError(_('Opening database failed: no such file'))
-    return Database(filename)

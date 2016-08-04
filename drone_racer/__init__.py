@@ -6,7 +6,7 @@ and to select a reader from the built-in ones.
 
 
 from .ui import DroneRacer as Application
-from .threads import StdInReader, XBeeReader, UDPReader
+from .threads import StdInReader, XBeeReader, UDPReader, TCPReader
 
 
 __all__ = [
@@ -14,4 +14,5 @@ __all__ = [
     'StdInReader',
     'XBeeReader',
     'UDPReader',
+    'TCPReader,
 ]
