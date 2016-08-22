@@ -1,19 +1,7 @@
-import socket
 from base64 import decodestring as decode_64
 
 from tornado import ioloop, web, websocket
 from settings import Settings
-
-
-try:
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.connect(('8.8.8.8', 80))
-    _host = s.getsockname()[0]
-except:
-    print('Cannot resolve own IP adress. Will close web server.')
-    raise
-finally:
-    s.close()
 
 
 last_race_setup = None
@@ -23,7 +11,7 @@ liveWebSockets = set()
 
 class MainHandler(web.RequestHandler):
     def get(self):
-        self.render("index.html", hostname=_host, port=Settings.port)
+        self.render("index.html")
 
 
 class BasicProtectedHandler(web.RequestHandler):
@@ -105,6 +93,7 @@ class DefaultWebSocket(websocket.WebSocketHandler):
         print('Message incomming:', message)
 
     def on_close(self):
+        liveWebSockets.remove(self)
         print("WebSocket closed")
 
 
@@ -142,9 +131,13 @@ def serve_forever():
         debug=Settings.debug,
     )
     application.listen(Settings.port)
-    print('Server listening at http://',  _host, ':', Settings.port, '/', sep='')
+    print('Server listening on port', Settings.port)
     server = ioloop.IOLoop.instance()
-    server.start()
+    try:
+        server.start()
+    except KeyboardInterrupt:
+        pass
+    print('Goodbye')
 
 
 if __name__ == "__main__":
